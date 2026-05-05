@@ -13,6 +13,7 @@
         .btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
         button { padding: 18px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; cursor: pointer; }
         .search-addr-btn { background: #f0f0f0; color: #333; margin-top: 10px; padding: 10px; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
         .tmap { background: #FF4B2B; } .naver { background: #03CF5D; } .kakao { background: #FAE100; color: #3c1e1e; }
         
         /* Postcodify 커스텀 스타일 */
@@ -59,6 +60,7 @@
             margin-top: 8px;
         }
         .hidden { display: none; }
+        .loading { opacity: 0.6; }
     </style>
 </head>
 <body>
@@ -82,9 +84,9 @@
 
     <!-- 네비게이션 버튼 -->
     <div class="btn-group">
-        <button class="tmap" onclick="goNavi('tmap')">T맵 실행</button>
-        <button class="naver" onclick="goNavi('naver')">네이버 지도 실행</button>
-        <button class="kakao" onclick="goNavi('kakao')">카카오맵 실행</button>
+        <button class="tmap" id="tmapBtn" onclick="goNavi('tmap')">T맵 실행</button>
+        <button class="naver" id="naverBtn" onclick="goNavi('naver')">네이버 지도 실행</button>
+        <button class="kakao" id="kakaoBtn" onclick="goNavi('kakao')">카카오맵 실행</button>
     </div>
 
     <!-- 디버그 로그 -->
@@ -140,6 +142,8 @@
         goal: { name: "", x: "", y: "" }
     };
     
+    let coordPending = {};
+    
     const VWORLD_KEY = '62A5D7CE-FE7A-3E45-B9D3-9982BFEB7A91';
     let postcodifyInstances = {};
 
@@ -148,6 +152,13 @@
         addLog('✅ jQuery 로드 완료', 'success');
         addLog('✅ Postcodify 준비 완료', 'success');
     });
+
+    function updateNavButtons() {
+        const hasGoal = data.goal.x && data.goal.y;
+        document.getElementById('tmapBtn').disabled = !hasGoal;
+        document.getElementById('naverBtn').disabled = !hasGoal;
+        document.getElementById('kakaoBtn').disabled = !hasGoal;
+    }
 
     function togglePostcodify(target) {
         const containerId = 'postcodify_' + target;
@@ -170,7 +181,12 @@
                 onSelect: function(data) {
                     const fullAddr = data.address;
                     addLog(`✅ 주소 선택 완료: ${fullAddr}`, 'success');
-                    document.getElementById(target + 'Addr').innerText = fullAddr + " (좌표 확인 중...)";
+                    document.getElementById(target + 'Addr').innerText = fullAddr + " ⏳ 좌표 확인 중...";
+                    
+                    // 로딩 상태 설정
+                    coordPending[target] = true;
+                    updateNavButtons();
+                    
                     getVworldCoords(fullAddr, target);
                     container.addClass('hidden');
                 }
@@ -190,12 +206,16 @@
             
             script.onerror = () => {
                 addLog(`❌ V-World API 호출 실패`, 'error');
-                document.getElementById(target + 'Addr').innerText = addr + " (좌표 확인 불가)";
+                document.getElementById(target + 'Addr').innerText = addr + " ❌ (좌표 확인 불가)";
+                coordPending[target] = false;
+                updateNavButtons();
             };
             
             document.head.appendChild(script);
         } catch (error) {
             addLog(`❌ 좌표 조회 에러: ${error.message}`, 'error');
+            coordPending[target] = false;
+            updateNavButtons();
         }
     }
 
@@ -219,13 +239,24 @@
             addLog(`✅ ${target === 'start' ? '출발지' : '목적지'} 저장 완료: (${point.x}, ${point.y})`, 'success');
         } else {
             addLog(`❌ V-World 응답 오류: ${json.response?.status || 'UNKNOWN'}`, 'error');
-            document.getElementById(target + 'Addr').innerText = "좌표 확인 실패";
+            document.getElementById(target + 'Addr').innerText = "❌ 좌표 확인 실패";
         }
+        
+        // 로딩 상태 해제
+        coordPending[target] = false;
+        updateNavButtons();
     }
 
     function goNavi(type) {
-        if (!data.goal.x) {
-            addLog('❌ 목적지 미설정', 'error');
+        // 로딩 중인 좌표가 있는지 확인
+        if (coordPending['goal']) {
+            addLog('⏳ 좌표 확인 중... 잠시 후 다시 시도해주세요.', 'warn');
+            alert("좌표를 확인하는 중입니다. 잠시 후 다시 시도해주세요.");
+            return;
+        }
+        
+        if (!data.goal.x || !data.goal.y) {
+            addLog('❌ 목적지 미설정 또는 좌표 없음', 'error');
             alert("목적지를 먼저 검색해 주세요.");
             return;
         }
@@ -244,6 +275,9 @@
         
         window.location.href = url;
     }
+
+    // 초기 상태 업데이트
+    updateNavButtons();
 </script>
 </body>
 </html>
