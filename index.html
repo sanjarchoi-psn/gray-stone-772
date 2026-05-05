@@ -4,18 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>통합 내비게이션</title>
+    <link rel="stylesheet" href="//d1p7wdleee1q2z.cloudfront.net/post/css/postcodify.css">
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f2f5; margin: 0; }
         .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #eee; }
         .label { font-size: 12px; color: #007AFF; font-weight: 800; margin-bottom: 8px; }
         .addr { font-size: 16px; color: #333; font-weight: 500; min-height: 20px; margin-bottom: 10px; }
-        .input-group { display: flex; gap: 8px; }
-        input[type="text"] { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
-        .search-btn { padding: 10px 15px; background: #007AFF; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .search-btn:active { opacity: 0.8; }
         .btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
         button { padding: 18px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; cursor: pointer; }
+        .search-addr-btn { background: #f0f0f0; color: #333; margin-top: 10px; padding: 10px; }
         .tmap { background: #FF4B2B; } .naver { background: #03CF5D; } .kakao { background: #FAE100; color: #3c1e1e; }
+        
+        /* Postcodify 커스텀 스타일 */
+        #postcodify_wrap { margin-top: 10px; }
         
         /* 디버그 로그 스타일 */
         #debug-container { margin-top: 20px; }
@@ -67,22 +68,16 @@
     <div class="card">
         <div class="label">START (출발지)</div>
         <div id="startAddr" class="addr">경기 용인시 기흥구 서천동 828</div>
-        <div class="input-group hidden" id="startInput">
-            <input type="text" id="startSearchInput" placeholder="새로운 출발지 입력" />
-            <button class="search-btn" onclick="searchAddress('start')">검색</button>
-        </div>
-        <button onclick="toggleInput('start')" style="width: 100%; background: #f0f0f0; color: #333; margin-top: 10px; padding: 10px;">출발지 변경</button>
+        <button class="search-addr-btn" onclick="togglePostcodify('start')">출발지 변경</button>
+        <div id="postcodify_start" class="hidden"></div>
     </div>
 
     <!-- 목적지 -->
     <div class="card">
         <div class="label">DESTINATION (목적지)</div>
         <div id="goalAddr" class="addr">목적지를 입력하세요</div>
-        <div class="input-group hidden" id="goalInput">
-            <input type="text" id="goalSearchInput" placeholder="목적지 입력" />
-            <button class="search-btn" onclick="searchAddress('goal')">검색</button>
-        </div>
-        <button onclick="toggleInput('goal')" style="width: 100%; background: #f0f0f0; color: #333; margin-top: 10px; padding: 10px;">목적지 입력</button>
+        <button class="search-addr-btn" onclick="togglePostcodify('goal')">목적지 입력</button>
+        <div id="postcodify_goal" class="hidden"></div>
     </div>
 
     <!-- 네비게이션 버튼 -->
@@ -98,6 +93,10 @@
         <div id="debug-log"></div>
         <button id="clear-btn" onclick="clearLog()">로그 초기화</button>
     </div>
+
+    <!-- jQuery와 Postcodify 라이브러리 로드 -->
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
+    <script src="//d1p7wdleee1q2z.cloudfront.net/post/search.min.js"></script>
 
 <script>
     // 디버그 로그 함수
@@ -134,7 +133,7 @@
 
     // 초기화
     addLog('페이지 로드 완료', 'success');
-    addLog('✅ 수동 주소 입력 모드 활성화', 'success');
+    addLog('✅ Postcodify 라이브러리 로드 중...', 'info');
 
     let data = {
         start: { name: "경기 용인시 기흥구 서천동 828", x: "127.0700", y: "37.2455" },
@@ -142,31 +141,45 @@
     };
     
     const VWORLD_KEY = '62A5D7CE-FE7A-3E45-B9D3-9982BFEB7A91';
+    let postcodifyInstances = {};
 
-    function toggleInput(target) {
-        const inputEl = document.getElementById(target + 'Input');
-        inputEl.classList.toggle('hidden');
-        
-        if (!inputEl.classList.contains('hidden')) {
-            document.getElementById(target + 'SearchInput').focus();
-            addLog(`📍 ${target === 'start' ? '출발지' : '목적지'} 입력 모드 활성화`, 'info');
-        }
-    }
+    // jQuery 로드 확인 및 Postcodify 초기화
+    $(document).ready(function() {
+        addLog('✅ jQuery 로드 완료', 'success');
+        addLog('✅ Postcodify 준비 완료', 'success');
+    });
 
-    function searchAddress(target) {
-        const inputEl = document.getElementById(target + 'SearchInput');
-        const addr = inputEl.value.trim();
-        
-        if (!addr) {
-            alert('주소를 입력해주세요.');
-            return;
-        }
-
+    function togglePostcodify(target) {
+        const containerId = 'postcodify_' + target;
+        const container = $('#' + containerId);
         const targetName = target === 'start' ? '출발지' : '목적지';
-        addLog(`🔍 ${targetName} 검색 중: ${addr}`, 'info');
-        document.getElementById(target + 'Addr').innerText = addr + " (좌표 확인 중...)";
         
-        getVworldCoords(addr, target);
+        addLog(`📍 ${targetName} 검색 UI 표시`, 'info');
+        
+        if (container.hasClass('hidden')) {
+            container.removeClass('hidden');
+            
+            // 이미 초기화된 경우 건너뛰기
+            if (postcodifyInstances[target]) {
+                return;
+            }
+            
+            // Postcodify 초기화
+            container.postcodify({
+                apikey: 'postcodify_api_free',
+                onSelect: function(data) {
+                    const fullAddr = data.address;
+                    addLog(`✅ 주소 선택 완료: ${fullAddr}`, 'success');
+                    document.getElementById(target + 'Addr').innerText = fullAddr + " (좌표 확인 중...)";
+                    getVworldCoords(fullAddr, target);
+                    container.addClass('hidden');
+                }
+            });
+            
+            postcodifyInstances[target] = true;
+        } else {
+            container.addClass('hidden');
+        }
     }
 
     function getVworldCoords(addr, target) {
@@ -203,8 +216,6 @@
             const fullAddr = json.response.refined.text;
             data[target] = { name: fullAddr, x: point.x, y: point.y };
             document.getElementById(target + 'Addr').innerText = fullAddr;
-            document.getElementById(target + 'Input').classList.add('hidden');
-            document.getElementById(target + 'SearchInput').value = '';
             addLog(`✅ ${target === 'start' ? '출발지' : '목적지'} 저장 완료: (${point.x}, ${point.y})`, 'success');
         } else {
             addLog(`❌ V-World 응답 오류: ${json.response?.status || 'UNKNOWN'}`, 'error');
@@ -233,15 +244,6 @@
         
         window.location.href = url;
     }
-
-    // Enter 키 지원
-    document.getElementById('startSearchInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') searchAddress('start');
-    });
-
-    document.getElementById('goalSearchInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') searchAddress('goal');
-    });
 </script>
 </body>
 </html>
