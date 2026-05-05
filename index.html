@@ -13,6 +13,47 @@
         .btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
         button { padding: 18px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; cursor: pointer; }
         .tmap { background: #FF4B2B; } .naver { background: #03CF5D; } .kakao { background: #FAE100; color: #3c1e1e; }
+        
+        /* 디버그 로그 스타일 */
+        #debug-container { margin-top: 20px; }
+        #debug-log { 
+            background: #1e1e1e; 
+            color: #00ff00; 
+            padding: 12px; 
+            margin-top: 10px; 
+            font-size: 11px; 
+            max-height: 200px; 
+            overflow-y: auto; 
+            border-radius: 8px; 
+            font-family: 'Courier New', monospace;
+            line-height: 1.4;
+            border: 1px solid #444;
+        }
+        .debug-title {
+            font-weight: bold;
+            color: #0099ff;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+        .debug-entry {
+            margin-bottom: 4px;
+            padding: 2px 0;
+            border-bottom: 1px solid #333;
+        }
+        .debug-error { color: #ff4444; }
+        .debug-success { color: #44ff44; }
+        .debug-info { color: #44ccff; }
+        .debug-warn { color: #ffaa44; }
+        #clear-btn {
+            background: #444;
+            color: #fff;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            font-size: 11px;
+            cursor: pointer;
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
@@ -31,12 +72,56 @@
         <button class="kakao" onclick="goNavi('kakao')">카카오맵 실행</button>
     </div>
 
+    <!-- 디버그 로그 -->
+    <div id="debug-container">
+        <div class="debug-title">🔍 디버그 로그</div>
+        <div id="debug-log"></div>
+        <button id="clear-btn" onclick="clearLog()">로그 초기화</button>
+    </div>
+
 <script>
+    // 디버그 로그 함수
+    const logContainer = document.getElementById('debug-log');
+    const maxLogs = 50;
+    let logs = [];
+
+    function addLog(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = { message, type, timestamp };
+        logs.unshift(logEntry);
+        
+        if (logs.length > maxLogs) {
+            logs.pop();
+        }
+        
+        renderLogs();
+        
+        // 콘솔에도 출력
+        console[type === 'error' ? 'error' : type === 'success' ? 'log' : 'log'](message);
+    }
+
+    function renderLogs() {
+        logContainer.innerHTML = logs.map(log => {
+            const className = `debug-entry debug-${log.type}`;
+            return `<div class="${className}">[${log.timestamp}] ${log.message}</div>`;
+        }).join('');
+        logContainer.scrollTop = 0;
+    }
+
+    function clearLog() {
+        logs = [];
+        renderLogs();
+        addLog('로그가 초기화되었습니다.', 'info');
+    }
+
+    // 초기화
+    addLog('페이지 로드 시작...', 'info');
+
     // Daum 라이브러리 로드 확인
     if (typeof daum === 'undefined') {
-        console.error('Daum Postcode 라이브러리가 로드되지 않았습니다.');
+        addLog('❌ Daum 라이브러리 로드 실패', 'error');
     } else {
-        console.log('Daum Postcode 라이브러리 로드 완료');
+        addLog('✅ Daum 라이브러리 로드 성공', 'success');
     }
 
     let data = {
@@ -46,67 +131,94 @@
     const VWORLD_KEY = '62A5D7CE-FE7A-3E45-B9D3-9982BFEB7A91';
     let currentTarget = '';
 
+    addLog('초기 데이터 설정 완료', 'success');
+
     function openPostcode(target) {
         try {
             currentTarget = target;
-            console.log('주소 검색 시작:', target);
+            const targetName = target === 'start' ? '출발지' : '목적지';
+            addLog(`📍 ${targetName} 검색 시작...`, 'info');
             
             if (typeof daum === 'undefined' || !daum.Postcode) {
+                addLog('❌ daum.Postcode를 찾을 수 없음', 'error');
                 alert('주소 검색 서비스를 로드 중입니다. 잠시 후 다시 시도해주세요.');
                 return;
             }
             
+            addLog('📂 주소 팝업 오픈 중...', 'warn');
+            
             new daum.Postcode({
                 oncomplete: function(res) {
-                    console.log('주소 선택 완료:', res.address);
+                    addLog(`✅ 주소 선택 완료: ${res.address}`, 'success');
                     const addr = res.address;
                     document.getElementById(currentTarget + 'Addr').innerText = addr + " (좌표 확인 중...)";
                     getVworldCoords(addr);
                 },
                 onclose: function() {
-                    console.log('주소 검색 팝업 닫음');
+                    addLog('❌ 주소 검색 팝업 닫음', 'warn');
                 }
             }).open();
         } catch (error) {
-            console.error('주소 검색 에러:', error);
+            addLog(`❌ 주소 검색 에러: ${error.message}`, 'error');
             alert('주소 검색에 실패했습니다: ' + error.message);
         }
     }
 
     function getVworldCoords(addr) {
         try {
+            addLog(`🌐 V-World API 호출 중: ${addr}`, 'info');
             const script = document.createElement('script');
             script.src = `https://api.vworld.kr/req/data?service=address&request=getcoord&crs=epsg:4326&address=${encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=vworldRes`;
+            
             script.onerror = () => {
-                console.error('V-World API 호출 실패');
+                addLog(`❌ V-World API 호출 실패`, 'error');
                 document.getElementById(currentTarget + 'Addr').innerText = addr + " (좌표 확인 불가)";
             };
+            
+            script.onload = () => {
+                addLog(`✅ V-World API 스크립트 로드 완료`, 'success');
+            };
+            
             document.head.appendChild(script);
         } catch (error) {
-            console.error('좌표 조회 에러:', error);
+            addLog(`❌ 좌표 조회 에러: ${error.message}`, 'error');
         }
     }
 
     window.vworldRes = function(json) {
-        console.log('V-World 응답:', json);
+        addLog(`📊 V-World 응답 수신`, 'info');
+        
         if (json.response && json.response.status === "OK") {
             const point = json.response.result.point;
             const fullAddr = json.response.refined.text;
             data[currentTarget] = { name: fullAddr, x: point.x, y: point.y };
             document.getElementById(currentTarget + 'Addr').innerText = fullAddr;
-            console.log('좌표 저장 완료:', data[currentTarget]);
+            addLog(`✅ 좌표 저장 완료: (${point.x}, ${point.y})`, 'success');
         } else {
-            console.warn('V-World 응답 오류:', json);
+            addLog(`❌ V-World 응답 오류: ${json.response?.status || 'UNKNOWN'}`, 'error');
         }
     };
 
     function goNavi(type) {
-        if (!data.goal.x) return alert("목적지를 먼저 검색해 주세요.");
+        if (!data.goal.x) {
+            addLog('❌ 목적지 미설정', 'error');
+            alert("목적지를 먼저 검색해 주세요.");
+            return;
+        }
+        
         const s = data.start, g = data.goal;
         let url = "";
+        const typeMap = { tmap: 'T맵', naver: '네이버', kakao: '카카오' };
+        
+        addLog(`🚗 ${typeMap[type]} 실행 중...`, 'info');
+        
         if(type === 'tmap') url = `tmap://route?goalname=${encodeURIComponent(g.name)}&goalx=${g.x}&goaly=${g.y}&startname=${encodeURIComponent(s.name)}&startx=${s.x}&starty=${s.y}`;
         else if(type === 'naver') url = `nmap://route/car?slat=${s.y}&slng=${s.x}&sname=${encodeURIComponent(s.name)}&dlat=${g.y}&dlng=${g.x}&dname=${encodeURIComponent(g.name)}&appname=mynavi`;
         else if(type === 'kakao') url = `kakaomap://route?sp=${s.y},${s.x}&sname=${encodeURIComponent(s.name)}&ep=${g.y},${g.x}&ename=${encodeURIComponent(g.name)}&by=CAR`;
+        
+        addLog(`📍 출발지: ${s.name}`, 'info');
+        addLog(`📍 목적지: ${g.name}`, 'info');
+        
         window.location.href = url;
     }
 </script>
