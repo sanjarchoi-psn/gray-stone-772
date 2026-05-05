@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>통합 내비게이션</title>
-    <script src="https://daumcdn.net"></script>
+    <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/is/postcode.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f2f5; margin: 0; }
         .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); cursor: pointer; border: 1px solid #eee; }
@@ -52,7 +52,7 @@
 
     function getVworldCoords(addr) {
         const script = document.createElement('script');
-        script.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=vworldRes`;
+        script.src = `https://api.vworld.kr/req/data?service=address&request=getcoord&crs=epsg:4326&address=${encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=vworldRes`;
         document.head.appendChild(script);
         script.onload = () => document.head.removeChild(script);
     }
