@@ -196,7 +196,7 @@
         addLog(`🔍 Postcodify 검색 중: ${query}`, 'info');
         
         try {
-            const response = await fetch(`https://api.poesis.dev/post/search?query=${encodeURIComponent(query)}`);
+            const response = await fetch(`/api/postcodify?q=${encodeURIComponent(query)}`);
             const json = await response.json();
             
             if (json.results && json.results.length > 0) {
