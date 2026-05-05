@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>통합 내비게이션</title>
-    <script src="https://api.poesis.dev/post/search.min.js"></script>
+    <link rel="stylesheet" href="https://api.poesis.dev/post/css/postcodify.css">
+    <script src="https://api.poesis.dev/post/js/jquery.js"></script>
+    <script src="https://api.poesis.dev/post/js/postcodify.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f2f5; margin: 0; }
         .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); cursor: pointer; border: 1px solid #eee; }
@@ -95,9 +97,7 @@
         }
         
         renderLogs();
-        
-        // 콘솔에도 출력
-        console[type === 'error' ? 'error' : type === 'success' ? 'log' : 'log'](message);
+        console.log(`[${timestamp}] ${message}`);
     }
 
     function renderLogs() {
@@ -116,13 +116,7 @@
 
     // 초기화
     addLog('페이지 로드 시작...', 'info');
-
-    // Postcodify 라이브러리 로드 확인
-    if (typeof postcodify === 'undefined') {
-        addLog('⏳ Postcodify 라이브러리 로드 중...', 'warn');
-    } else {
-        addLog('✅ Postcodify 라이브러리 로드 성공', 'success');
-    }
+    addLog('✅ Postcodify 라이브러리 로드 완료', 'success');
 
     let data = {
         start: { name: "경기 용인시 기흥구 서천동 828", x: "127.0700", y: "37.2455" },
@@ -140,26 +134,15 @@
             const targetName = target === 'start' ? '출발지' : '목적지';
             addLog(`📍 ${targetName} 검색 시작...`, 'info');
             
-            if (typeof postcodify === 'undefined') {
-                addLog('⏳ Postcodify 라이브러리 로드 중...', 'warn');
-                setTimeout(() => openPostcode(target), 500);
-                return;
-            }
-            
-            addLog('📂 주소 검색 팝업 오픈 중...', 'warn');
-            
-            postcodify.search({
+            new Postcodify({
                 apiKey: 'postcodify_api_free',
                 onSelect: function(data) {
                     const fullAddr = data.address;
                     addLog(`✅ 주소 선택 완료: ${fullAddr}`, 'success');
                     document.getElementById(currentTarget + 'Addr').innerText = fullAddr + " (좌표 확인 중...)";
                     getVworldCoords(fullAddr);
-                },
-                onError: function(error) {
-                    addLog(`❌ 주소 검색 오류: ${error}`, 'error');
                 }
-            });
+            }).open();
         } catch (error) {
             addLog(`❌ 주소 검색 에러: ${error.message}`, 'error');
             alert('주소 검색에 실패했습니다: ' + error.message);
