@@ -32,6 +32,13 @@
     </div>
 
 <script>
+    // Daum 라이브러리 로드 확인
+    if (typeof daum === 'undefined') {
+        console.error('Daum Postcode 라이브러리가 로드되지 않았습니다.');
+    } else {
+        console.log('Daum Postcode 라이브러리 로드 완료');
+    }
+
     let data = {
         start: { name: "경기 용인시 기흥구 서천동 828", x: "127.0700", y: "37.2455" },
         goal: { name: "", x: "", y: "" }
@@ -40,29 +47,56 @@
     let currentTarget = '';
 
     function openPostcode(target) {
-        currentTarget = target;
-        new daum.Postcode({
-            oncomplete: function(res) {
-                const addr = res.address;
-                document.getElementById(currentTarget + 'Addr').innerText = addr + " (좌표 확인 중...)";
-                getVworldCoords(addr);
+        try {
+            currentTarget = target;
+            console.log('주소 검색 시작:', target);
+            
+            if (typeof daum === 'undefined' || !daum.Postcode) {
+                alert('주소 검색 서비스를 로드 중입니다. 잠시 후 다시 시도해주세요.');
+                return;
             }
-        }).open(); // 팝업으로 열기
+            
+            new daum.Postcode({
+                oncomplete: function(res) {
+                    console.log('주소 선택 완료:', res.address);
+                    const addr = res.address;
+                    document.getElementById(currentTarget + 'Addr').innerText = addr + " (좌표 확인 중...)";
+                    getVworldCoords(addr);
+                },
+                onclose: function() {
+                    console.log('주소 검색 팝업 닫음');
+                }
+            }).open();
+        } catch (error) {
+            console.error('주소 검색 에러:', error);
+            alert('주소 검색에 실패했습니다: ' + error.message);
+        }
     }
 
     function getVworldCoords(addr) {
-        const script = document.createElement('script');
-        script.src = `https://api.vworld.kr/req/data?service=address&request=getcoord&crs=epsg:4326&address=${encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=vworldRes`;
-        document.head.appendChild(script);
-        script.onload = () => document.head.removeChild(script);
+        try {
+            const script = document.createElement('script');
+            script.src = `https://api.vworld.kr/req/data?service=address&request=getcoord&crs=epsg:4326&address=${encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=vworldRes`;
+            script.onerror = () => {
+                console.error('V-World API 호출 실패');
+                document.getElementById(currentTarget + 'Addr').innerText = addr + " (좌표 확인 불가)";
+            };
+            document.head.appendChild(script);
+        } catch (error) {
+            console.error('좌표 조회 에러:', error);
+        }
     }
 
     window.vworldRes = function(json) {
+        console.log('V-World 응답:', json);
         if (json.response && json.response.status === "OK") {
             const point = json.response.result.point;
             const fullAddr = json.response.refined.text;
             data[currentTarget] = { name: fullAddr, x: point.x, y: point.y };
             document.getElementById(currentTarget + 'Addr').innerText = fullAddr;
+            console.log('좌표 저장 완료:', data[currentTarget]);
+        } else {
+            console.warn('V-World 응답 오류:', json);
         }
     };
 
