@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>통합 내비게이션</title>
+    <script src="https://daumcdn.net"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f2f5; margin: 0; }
+        .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); cursor: pointer; border: 1px solid #eee; }
+        .label { font-size: 12px; color: #007AFF; font-weight: 800; margin-bottom: 8px; }
+        .addr { font-size: 16px; color: #333; font-weight: 500; min-height: 20px; }
+        .btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+        button { padding: 18px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; cursor: pointer; }
+        .tmap { background: #FF4B2B; } .naver { background: #03CF5D; } .kakao { background: #FAE100; color: #3c1e1e; }
+    </style>
+</head>
+<body>
+    <h2 style="text-align:center;">🗺️ 통합 내비게이션</h2>
+    <div class="card" onclick="openPostcode('start')">
+        <div class="label">START (출발지)</div>
+        <div id="startAddr" class="addr">경기 용인시 기흥구 서천동 828</div>
+    </div>
+    <div class="card" onclick="openPostcode('goal')">
+        <div class="label">DESTINATION (목적지)</div>
+        <div id="goalAddr" class="addr">목적지를 입력하세요</div>
+    </div>
+    <div class="btn-group">
+        <button class="tmap" onclick="goNavi('tmap')">T맵 실행</button>
+        <button class="naver" onclick="goNavi('naver')">네이버 지도 실행</button>
+        <button class="kakao" onclick="goNavi('kakao')">카카오맵 실행</button>
+    </div>
+
+<script>
+    let data = {
+        start: { name: "경기 용인시 기흥구 서천동 828", x: "127.0700", y: "37.2455" },
+        goal: { name: "", x: "", y: "" }
+    };
+    const VWORLD_KEY = '62A5D7CE-FE7A-3E45-B9D3-9982BFEB7A91';
+    let currentTarget = '';
+
+    function openPostcode(target) {
+        currentTarget = target;
+        new daum.Postcode({
+            oncomplete: function(res) {
+                const addr = res.address;
+                document.getElementById(currentTarget + 'Addr').innerText = addr + " (좌표 확인 중...)";
+                getVworldCoords(addr);
+            }
+        }).open(); // 팝업으로 열기
+    }
+
+    function getVworldCoords(addr) {
+        const script = document.createElement('script');
+        script.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=vworldRes`;
+        document.head.appendChild(script);
+        script.onload = () => document.head.removeChild(script);
+    }
+
+    window.vworldRes = function(json) {
+        if (json.response && json.response.status === "OK") {
+            const point = json.response.result.point;
+            const fullAddr = json.response.refined.text;
+            data[currentTarget] = { name: fullAddr, x: point.x, y: point.y };
+            document.getElementById(currentTarget + 'Addr').innerText = fullAddr;
+        }
+    };
+
+    function goNavi(type) {
+        if (!data.goal.x) return alert("목적지를 먼저 검색해 주세요.");
+        const s = data.start, g = data.goal;
+        let url = "";
+        if(type === 'tmap') url = `tmap://route?goalname=${encodeURIComponent(g.name)}&goalx=${g.x}&goaly=${g.y}&startname=${encodeURIComponent(s.name)}&startx=${s.x}&starty=${s.y}`;
+        else if(type === 'naver') url = `nmap://route/car?slat=${s.y}&slng=${s.x}&sname=${encodeURIComponent(s.name)}&dlat=${g.y}&dlng=${g.x}&dname=${encodeURIComponent(g.name)}&appname=mynavi`;
+        else if(type === 'kakao') url = `kakaomap://route?sp=${s.y},${s.x}&sname=${encodeURIComponent(s.name)}&ep=${g.y},${g.x}&ename=${encodeURIComponent(g.name)}&by=CAR`;
+        window.location.href = url;
+    }
+</script>
+</body>
+</html>
