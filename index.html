@@ -165,7 +165,7 @@
 
     let data = {
         start: { name: "경기 용인시 기흥구 서천동 828", x: "127.0700", y: "37.2455" },
-        goal: { name: "", x: "", y: "" }
+        goal: { name: "서울특별시 강서구 마곡중앙10로 10", x: "126.8286", y: "37.5615" }
     };
     
     let coordPending = {};
@@ -185,7 +185,7 @@
     }
 
     function searchPostcodify(target) {
-    new daum.Postcode({
+        new daum.Postcode({
         oncomplete: function(data) {
             // 팝업에서 검색결과 항목을 클릭했을 때 실행할 코드를 작성합니다.
             const addr = data.roadAddress || data.address; // 도로명 주소 또는 지번 주소
@@ -204,8 +204,8 @@
                 getCoords(addr, target);
             }
         }
-    }).open();
-}
+        }).open();
+    }
 
 
 
