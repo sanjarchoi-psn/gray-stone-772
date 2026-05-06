@@ -6,17 +6,16 @@
     <meta name="robots" content="noindex, nofollow">
     <title>통합 내비게이션</title>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f2f5; margin: 0; }
+        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f2f5; margin: 0; overflow-x: hidden; }
         .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #eee; }
         .label { font-size: 12px; color: #007AFF; font-weight: 800; margin-bottom: 8px; }
-        .addr { font-size: 16px; color: #333; font-weight: 500; min-height: 20px; margin-bottom: 10px; }
+        .addr { font-size: 16px; color: #333; font-weight: 500; min-height: 20px; margin-bottom: 10px; word-break: keep-all; }
         .btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
-        button { padding: 18px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; cursor: pointer; transition: opacity 0.2s; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button { padding: 18px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; cursor: pointer; }
         .tmap { background: #FF4B2B; } .naver { background: #03CF5D; } .kakao { background: #FAE100; color: #3c1e1e; }
-        #debug-log { background: #1e1e1e; color: #00ff00; padding: 12px; margin-top: 20px; font-size: 11px; max-height: 150px; overflow-y: auto; border-radius: 8px; font-family: monospace; border: 1px solid #444; }
+        #debug-log { background: #1e1e1e; color: #00ff00; padding: 12px; margin-top: 20px; font-size: 11px; max-height: 150px; overflow-y: auto; border-radius: 8px; font-family: monospace; border: 1px solid #444; line-height: 1.5; }
         .debug-entry { margin-bottom: 4px; border-bottom: 1px solid #333; }
-        .debug-success { color: #44ff44; } .debug-error { color: #ff4444; } .debug-info { color: #44ccff; }
+        .debug-success { color: #44ff44; } .debug-error { color: #ff4444; }
     </style>
 </head>
 <body>
@@ -34,6 +33,79 @@
         <button style="background: #f0f0f0; color: #333; width: 100%; padding: 10px; border-radius: 8px; font-size: 14px;" onclick="openPostcode('goal')">목적지 변경</button>
     </div>
 
+    <div class="btn-group">
+        <button class="tmap" onclick="goNavi('tmap')">T맵 실행</button>
+        <button class="naver" onclick="goNavi('naver')">네이버 지도 실행</button>
+        <button class="kakao" onclick="goNavi('kakao')">카카오맵 실행</button>
+    </div>
+
+    <div id="debug-log"></div>
+
+    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+    <script>
+        const VWORLD_KEY = '62A5D7CE-FE7A-3E45-B9D3-9982BFEB7A91';
+        const logBox = document.getElementById('debug-log');
+
+        let data = {
+            start: { name: "경기 용인시 기흥구 서천동 828", x: "127.0700", y: "37.2455" },
+            goal: { name: "서울특별시 강서구 마곡중앙10로 10", x: "126.8286", y: "37.5615" }
+        };
+
+        function addLog(msg, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            logBox.innerHTML = `<div class="debug-entry debug-${type}">[${time}] ${msg}</div>` + logBox.innerHTML;
+        }
+
+        function openPostcode(target) {
+            new daum.Postcode({
+                oncomplete: function(res) {
+                    const addr = res.roadAddress || res.address;
+                    document.getElementById(target + 'Addr').innerText = addr + " (⏳ 좌표 확인 중...)";
+                    data[target].name = addr;
+                    addLog(`${target === 'start' ? '출발지' : '목적지'} 변경: ${addr}`, 'success');
+                    
+                    // JSONP 요청을 위한 동적 스크립트 생성 (CORS 해결)
+                    const callbackName = `vworld_${target}`;
+                    window[callbackName] = function(json) {
+                        if (json.response && json.response.status === "OK") {
+                            const pt = json.response.result.point;
+                            data[target].x = pt.x;
+                            data[target].y = pt.y;
+                            document.getElementById(target + 'Addr').innerText = data[target].name;
+                            addLog(`📍 좌표 획득 성공: ${pt.x}, ${pt.y}`, 'success');
+                        } else {
+                            addLog(`❌ 좌표 변환 실패`, 'error');
+                            document.getElementById(target + 'Addr').innerText = data[target].name + " (⚠️ 좌표 실패)";
+                        }
+                        document.getElementById(`js_${target}`)?.remove();
+                    };
+
+                    const script = document.createElement('script');
+                    script.id = `js_${target}`;
+                    script.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${callbackName}`;
+                    document.head.appendChild(script);
+                }
+            }).open();
+        }
+
+        function goNavi(type) {
+            const s = data.start;
+            const g = data.goal;
+            if (!g.x || !g.y) { alert("좌표를 확인 중입니다."); return; }
+
+            addLog(`${type} 실행 시도`, 'info');
+            let url = "";
+            if (type === 'tmap') url = `tmap://route?goalname=${encodeURIComponent(g.name)}&goalx=${g.x}&goaly=${g.y}&startname=${encodeURIComponent(s.name)}&startx=${s.x}&starty=${s.y}`;
+            else if (type === 'naver') url = `nmap://route/car?slat=${s.y}&slng=${s.x}&sname=${encodeURIComponent(s.name)}&dlat=${g.y}&dlng=${g.x}&dname=${encodeURIComponent(g.name)}&appname=mynavi`;
+            else if (type === 'kakao') url = `kakaomap://route?sp=${s.y},${s.x}&sname=${encodeURIComponent(s.name)}&ep=${g.y},${g.x}&ename=${encodeURIComponent(g.name)}&by=CAR`;
+            
+            window.location.href = url;
+        }
+
+        window.onload = () => addLog('🚀 준비 완료 (용인 -> 마곡)', 'success');
+    </script>
+</body>
+</html>
     <div class="btn-group">
         <button class="tmap" id="tmapBtn" onclick="goNavi('tmap')">T맵 실행</button>
         <button class="naver" id="naverBtn" onclick="goNavi('naver')">네이버 지도 실행</button>
