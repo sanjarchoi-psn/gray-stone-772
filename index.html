@@ -14,9 +14,9 @@
         button { padding: 18px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; cursor: pointer; transition: opacity 0.2s; }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
         .tmap { background: #FF4B2B; } .naver { background: #03CF5D; } .kakao { background: #FAE100; color: #3c1e1e; }
-        #debug-log { background: #1e1e1e; color: #00ff00; padding: 12px; margin-top: 20px; font-size: 11px; max-height: 150px; overflow-y: auto; border-radius: 8px; font-family: monospace; }
+        #debug-log { background: #1e1e1e; color: #00ff00; padding: 12px; margin-top: 20px; font-size: 11px; max-height: 150px; overflow-y: auto; border-radius: 8px; font-family: monospace; border: 1px solid #444; }
         .debug-entry { margin-bottom: 4px; border-bottom: 1px solid #333; }
-        .debug-success { color: #44ff44; } .debug-error { color: #ff4444; }
+        .debug-success { color: #44ff44; } .debug-error { color: #ff4444; } .debug-info { color: #44ccff; }
     </style>
 </head>
 <body>
@@ -42,13 +42,11 @@
 
     <div id="debug-log"></div>
 
-    <!-- 외부 스크립트는 별도로 분리 -->
     <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
     <script>
         const VWORLD_KEY = '62A5D7CE-FE7A-3E45-B9D3-9982BFEB7A91';
         const logContainer = document.getElementById('debug-log');
 
-        // 1. 초기 데이터 설정 (목적지: 마곡중앙10로 10 기본값)
         let data = {
             start: { name: "경기 용인시 기흥구 서천동 828", x: "127.0700", y: "37.2455" },
             goal: { name: "서울특별시 강서구 마곡중앙10로 10", x: "126.8286", y: "37.5615" }
@@ -59,7 +57,6 @@
             logContainer.innerHTML = `<div class="debug-entry debug-${type}">[${time}] ${msg}</div>` + logContainer.innerHTML;
         }
 
-        // 2. 주소 검색창 열기
         function openPostcode(target) {
             new daum.Postcode({
                 oncomplete: function(res) {
@@ -67,47 +64,52 @@
                     document.getElementById(target + 'Addr').innerText = addr + " (좌표 확인 중...)";
                     data[target].name = addr;
                     addLog(`${target === 'start' ? '출발지' : '목적지'} 선택: ${addr}`, 'success');
+                    
+                    // JSONP 방식으로 좌표 요청 (보안 에러 방지)
                     getVworldCoords(addr, target);
                 }
             }).open();
         }
 
-        // 3. V-World 좌표 변환 (fetch 방식)
-        async function getVworldCoords(addr, target) {
-            addLog(`🌐 V-World 좌표 변환 시작...`, 'info');
-            try {
-                const url = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}`;
-                const response = await fetch(url);
-                const json = await response.json();
-                
+        function getVworldCoords(addr, target) {
+            addLog(`🌐 V-World 좌표 변환 중...`, 'info');
+            
+            // 기존 콜백 함수가 있다면 제거
+            const callbackName = `vworldCallback_${target}`;
+            
+            window[callbackName] = function(json) {
                 if (json.response && json.response.status === "OK") {
                     const point = json.response.result.point;
                     data[target].x = point.x;
                     data[target].y = point.y;
-                    document.getElementById(target + 'Addr').innerText = addr; // 로딩 문구 제거
-                    addLog(`📍 좌표 획득 성공: ${point.x}, ${point.y}`, 'success');
+                    document.getElementById(target + 'Addr').innerText = data[target].name;
+                    addLog(`📍 좌표 획득 완료: ${point.x}, ${point.y}`, 'success');
                 } else {
-                    throw new Error(json.response?.status || 'UNKNOWN_ERROR');
+                    addLog(`⚠️ 좌표 변환 실패 (${json.response?.status})`, 'error');
+                    document.getElementById(target + 'Addr').innerText = data[target].name + " (좌표 실패)";
                 }
-            } catch (err) {
-                addLog(`❌ 좌표 변환 실패: ${err.message}`, 'error');
-                alert('좌표를 가져오지 못했습니다. 기본 좌표를 사용합니다.');
-            }
+                // 사용한 스크립트 태그 삭제
+                document.getElementById(`vworld_script_${target}`)?.remove();
+            };
+
+            const script = document.createElement('script');
+            script.id = `vworld_script_${target}`;
+            script.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${callbackName}`;
+            document.head.appendChild(script);
         }
 
-        // 4. 내비게이션 실행
         function goNavi(type) {
             const s = data.start;
             const g = data.goal;
-            let url = "";
 
             if (!g.x || !g.y) {
-                alert("목적지 좌표가 없습니다.");
+                alert("목적지 좌표를 불러오는 중입니다. 잠시만 기다려주세요.");
                 return;
             }
 
-            addLog(`🚗 ${type} 안내 시작: ${g.name}`, 'info');
+            addLog(`🚗 ${type} 앱 호출 시도...`, 'info');
 
+            let url = "";
             if (type === 'tmap') {
                 url = `tmap://route?goalname=${encodeURIComponent(g.name)}&goalx=${g.x}&goaly=${g.y}&startname=${encodeURIComponent(s.name)}&startx=${s.x}&starty=${s.y}`;
             } else if (type === 'naver') {
@@ -121,305 +123,5 @@
 
         window.onload = () => addLog('🚀 통합 내비게이션 준비 완료', 'success');
     </script>
-</body>
-</html>
-        .result-type { font-size: 11px; color: #999; margin-top: 3px; }
-        .hidden { display: none; }
-        
-        .btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
-        button { padding: 18px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; cursor: pointer; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .tmap { background: #FF4B2B; } .naver { background: #03CF5D; } .kakao { background: #FAE100; color: #3c1e1e; }
-        
-        /* 디버그 로그 스타일 */
-        #debug-container { margin-top: 20px; }
-        #debug-log { 
-            background: #1e1e1e; 
-            color: #00ff00; 
-            padding: 12px; 
-            margin-top: 10px; 
-            font-size: 11px; 
-            max-height: 200px; 
-            overflow-y: auto; 
-            border-radius: 8px; 
-            font-family: 'Courier New', monospace;
-            line-height: 1.4;
-            border: 1px solid #444;
-        }
-        .debug-title {
-            font-weight: bold;
-            color: #0099ff;
-            margin-bottom: 8px;
-            font-size: 12px;
-        }
-        .debug-entry {
-            margin-bottom: 4px;
-            padding: 2px 0;
-            border-bottom: 1px solid #333;
-        }
-        .debug-error { color: #ff4444; }
-        .debug-success { color: #44ff44; }
-        .debug-info { color: #44ccff; }
-        .debug-warn { color: #ffaa44; }
-        #clear-btn {
-            background: #444;
-            color: #fff;
-            padding: 8px 12px;
-            border: none;
-            border-radius: 5px;
-            font-size: 11px;
-            cursor: pointer;
-            margin-top: 8px;
-        }
-    </style>
-</head>
-<body>
-    <h2 style="text-align:center;">🗺️ 통합 내비게이션</h2>
-    
-    <!-- 출발지 -->
-    <div class="card">
-        <div class="label">START (출발지)</div>
-        <div id="startAddr" class="addr">경기 용인시 기흥구 서천동 828</div>
-        <div class="input-group hidden" id="startInput">
-            <input type="text" id="startSearchInput" placeholder="출발지 검색..." />
-            <button class="search-btn" onclick="searchPostcodify('start')">검색</button>
-        </div>
-        <div class="result-list hidden" id="startResults"></div>
-        <button style="background: #f0f0f0; color: #333; margin-top: 10px; padding: 10px;" onclick="toggleSearch('start')">출발지 변경</button>
-    </div>
-
-    <!-- 목적지 -->
-    <div class="card">
-        <div class="label">DESTINATION (목적지)</div>
-        <div id="goalAddr" class="addr">목적지를 입력하세요</div>
-        <div class="input-group hidden" id="goalInput">
-            <input type="text" id="goalSearchInput" placeholder="목적지 검색..." />
-            <button class="search-btn" onclick="searchPostcodify('goal')">검색</button>
-        </div>
-        <div class="result-list hidden" id="goalResults"></div>
-        <button style="background: #f0f0f0; color: #333; margin-top: 10px; padding: 10px;" onclick="toggleSearch('goal')">목적지 입력</button>
-    </div>
-
-    <!-- 네비게이션 버튼 -->
-    <div class="btn-group">
-        <button class="tmap" id="tmapBtn" onclick="goNavi('tmap')">T맵 실행</button>
-        <button class="naver" id="naverBtn" onclick="goNavi('naver')">네이버 지도 실행</button>
-        <button class="kakao" id="kakaoBtn" onclick="goNavi('kakao')">카카오맵 실행</button>
-    </div>
-
-    <!-- 디버그 로그 -->
-    <div id="debug-container">
-        <div class="debug-title">🔍 디버그 로그</div>
-        <div id="debug-log"></div>
-        <button id="clear-btn" onclick="clearLog()">로그 초기화</button>
-    </div>
-
-<script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js">
-
-    // 디버그 로그 함수
-    const logContainer = document.getElementById('debug-log');
-    const maxLogs = 50;
-    let logs = [];
-
-    function addLog(message, type = 'info') {
-        const timestamp = new Date().toLocaleTimeString();
-        const logEntry = { message, type, timestamp };
-        logs.unshift(logEntry);
-        
-        if (logs.length > maxLogs) {
-            logs.pop();
-        }
-        
-        renderLogs();
-        console.log(`[${timestamp}] ${message}`);
-    }
-
-    function renderLogs() {
-        logContainer.innerHTML = logs.map(log => {
-            const className = `debug-entry debug-${log.type}`;
-            return `<div class="${className}">[${log.timestamp}] ${log.message}</div>`;
-        }).join('');
-        logContainer.scrollTop = 0;
-    }
-
-    function clearLog() {
-        logs = [];
-        renderLogs();
-        addLog('로그가 초기화되었습니다.', 'info');
-    }
-
-    // 초기화
-    addLog('페이지 로드 완료', 'success');
-    addLog('✅ Postcodify REST API 모드 활성화', 'success');
-
-    let data = {
-        start: { name: "경기 용인시 기흥구 서천동 828", x: "127.0700", y: "37.2455" },
-        goal: { name: "서울특별시 강서구 마곡중앙10로 10", x: "126.8286", y: "37.5615" }
-    };
-    
-    let coordPending = {};
-    const VWORLD_KEY = '62A5D7CE-FE7A-3E45-B9D3-9982BFEB7A91';
-
-    function toggleSearch(target) {
-        const inputEl = document.getElementById(target + 'Input');
-        const resultsEl = document.getElementById(target + 'Results');
-        
-        inputEl.classList.toggle('hidden');
-        resultsEl.classList.add('hidden');
-        
-        if (!inputEl.classList.contains('hidden')) {
-            document.getElementById(target + 'SearchInput').focus();
-            addLog(`📍 ${target === 'start' ? '출발지' : '목적지'} 검색 모드 활성화`, 'info');
-        }
-    }
-
-    function searchPostcodify(target) {
-        new daum.Postcode({
-        oncomplete: function(data) {
-            // 팝업에서 검색결과 항목을 클릭했을 때 실행할 코드를 작성합니다.
-            const addr = data.roadAddress || data.address; // 도로명 주소 또는 지번 주소
-            
-            // 화면 표시 및 데이터 저장
-            document.getElementById(target + 'Addr').innerText = addr;
-            window.data[target].name = addr;
-            
-            addLog(`✅ ${target === 'start' ? '출발지' : '목적지'} 설정 완료: ${addr}`, 'success');
-            
-            // 입력창 닫기
-            toggleSearch(target);
-            
-            // 주소를 좌표로 변환하는 함수가 있다면 여기서 호출
-            if (typeof getCoords === 'function') {
-                getCoords(addr, target);
-            }
-        }
-        }).open();
-    }
-
-
-
-    function displayResults(results, target, resultsEl) {
-        resultsEl.innerHTML = results.map((item, idx) => `
-            <div class="result-item" onclick="selectAddress('${target}', '${item.address.replace(/'/g, "\\'")}', ${idx})">
-                <div class="result-addr">${item.address}</div>
-                <div class="result-type">${item.type === 'road' ? '도로명주소' : '지번주소'}</div>
-            </div>
-        `).join('');
-        resultsEl.classList.remove('hidden');
-    }
-
-    function selectAddress(target, addr, idx) {
-        const targetName = target === 'start' ? '출발지' : '목적지';
-        addLog(`✅ 주소 선택 완료: ${addr}`, 'success');
-        document.getElementById(target + 'Addr').innerText = addr + " ⏳ 좌표 확인 중...";
-        
-        // 로딩 상태 설정
-        coordPending[target] = true;
-        updateNavButtons();
-        
-        // 입력 UI 닫기
-        document.getElementById(target + 'Input').classList.add('hidden');
-        document.getElementById(target + 'Results').classList.add('hidden');
-        
-        getVworldCoords(addr, target);
-    }
-
-    function getVworldCoords(addr, target) {
-        try {
-            addLog(`🌐 V-World API 호출 중...`, 'info');
-            const script = document.createElement('script');
-            script.src = `https://api.vworld.kr/req/data?service=address&request=getcoord&crs=epsg:4326&address=${encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=vworldRes_${target}`;
-            
-            script.onerror = () => {
-                addLog(`❌ V-World API 호출 실패`, 'error');
-                document.getElementById(target + 'Addr').innerText = addr + " ❌ (좌표 확인 불가)";
-                coordPending[target] = false;
-                updateNavButtons();
-            };
-            
-            document.head.appendChild(script);
-        } catch (error) {
-            addLog(`❌ 좌표 조회 에러: ${error.message}`, 'error');
-            coordPending[target] = false;
-            updateNavButtons();
-        }
-    }
-
-    // V-World 콜백 함수들
-    window.vworldRes_start = function(json) {
-        handleVWorldResponse(json, 'start');
-    };
-
-    window.vworldRes_goal = function(json) {
-        handleVWorldResponse(json, 'goal');
-    };
-
-    function handleVWorldResponse(json, target) {
-        addLog(`📊 V-World 응답 수신`, 'info');
-        
-        if (json.response && json.response.status === "OK") {
-            const point = json.response.result.point;
-            const fullAddr = json.response.refined.text;
-            data[target] = { name: fullAddr, x: point.x, y: point.y };
-            document.getElementById(target + 'Addr').innerText = fullAddr;
-            addLog(`✅ ${target === 'start' ? '출발지' : '목적지'} 저장 완료: (${point.x}, ${point.y})`, 'success');
-        } else {
-            addLog(`❌ V-World 응답 오류: ${json.response?.status || 'UNKNOWN'}`, 'error');
-            document.getElementById(target + 'Addr').innerText = "❌ 좌표 확인 실패";
-        }
-        
-        // 로딩 상태 해제
-        coordPending[target] = false;
-        updateNavButtons();
-    }
-
-    function updateNavButtons() {
-        const hasGoal = data.goal.x && data.goal.y;
-        document.getElementById('tmapBtn').disabled = !hasGoal;
-        document.getElementById('naverBtn').disabled = !hasGoal;
-        document.getElementById('kakaoBtn').disabled = !hasGoal;
-    }
-
-    function goNavi(type) {
-        // 로딩 중인 좌표가 있는지 확인
-        if (coordPending['goal']) {
-            addLog('⏳ 좌표 확인 중... 잠시 후 다시 시도해주세요.', 'warn');
-            alert("좌표를 확인하는 중입니다. 잠시 후 다시 시도해주세요.");
-            return;
-        }
-        
-        if (!data.goal.x || !data.goal.y) {
-            addLog('❌ 목적지 미설정 또는 좌표 없음', 'error');
-            alert("목적지를 먼저 검색해 주세요.");
-            return;
-        }
-        
-        const s = data.start, g = data.goal;
-        let url = "";
-        const typeMap = { tmap: 'T맵', naver: '네이버', kakao: '카카오' };
-        
-        addLog(`🚗 ${typeMap[type]} 실행 중...`, 'info');
-        addLog(`📍 출발지: ${s.name}`, 'info');
-        addLog(`📍 목적지: ${g.name}`, 'info');
-        
-        if(type === 'tmap') url = `tmap://route?goalname=${encodeURIComponent(g.name)}&goalx=${g.x}&goaly=${g.y}&startname=${encodeURIComponent(s.name)}&startx=${s.x}&starty=${s.y}`;
-        else if(type === 'naver') url = `nmap://route/car?slat=${s.y}&slng=${s.x}&sname=${encodeURIComponent(s.name)}&dlat=${g.y}&dlng=${g.x}&dname=${encodeURIComponent(g.name)}&appname=mynavi`;
-        else if(type === 'kakao') url = `kakaomap://route?sp=${s.y},${s.x}&sname=${encodeURIComponent(s.name)}&ep=${g.y},${g.x}&ename=${encodeURIComponent(g.name)}&by=CAR`;
-        
-        window.location.href = url;
-    }
-
-    // Enter 키 지원
-    document.getElementById('startSearchInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') searchPostcodify('start');
-    });
-
-    document.getElementById('goalSearchInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') searchPostcodify('goal');
-    });
-
-    // 초기 상태 업데이트
-    updateNavButtons();
-</script>
 </body>
 </html>
