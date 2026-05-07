@@ -7,39 +7,37 @@
     <title>통합 내비게이션</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f2f5; margin: 0; }
-        .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #eee; position: relative; }
+        .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #eee; position: relative; }
         .label { font-size: 12px; color: #007AFF; font-weight: 800; margin-bottom: 8px; }
-        .addr { font-size: 16px; color: #333; font-weight: 500; min-height: 20px; margin-bottom: 10px; word-break: keep-all; }
-        .swap-btn { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); background: #fff; border: 1px solid #ddd; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+        .addr { font-size: 16px; color: #333; font-weight: 500; min-height: 20px; margin-bottom: 10px; word-break: keep-all; width: 85%; }
+        .swap-btn { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: #fff; border: 1px solid #ddd; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-size: 20px; }
+        .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
         button.navi-btn { padding: 18px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; cursor: pointer; }
+        .all-btn { background: #333; margin-bottom: 5px; border: 2px solid #000; }
         .tmap { background: #FF4B2B; } .naver { background: #03CF5D; } .kakao { background: #FAE100; color: #3c1e1e; }
-        #debug-log { background: #1e1e1e; color: #00ff00; padding: 12px; margin-top: 20px; font-size: 11px; max-height: 150px; overflow-y: auto; border-radius: 8px; font-family: monospace; border: 1px solid #444; }
+        #debug-log { background: #1e1e1e; color: #00ff00; padding: 12px; margin-top: 20px; font-size: 11px; max-height: 120px; overflow-y: auto; border-radius: 8px; font-family: monospace; }
     </style>
 </head>
 <body>
     <h2 style="text-align:center;">🗺️ 통합 내비게이션</h2>
     
     <div style="position: relative;">
-        <!-- 출발지 -->
         <div class="card">
             <div class="label">START (출발지)</div>
             <div id="startAddr" class="addr">경기 용인시 기흥구 서천동 828</div>
-            <button style="background: #f0f0f0; color: #333; width: 80%; padding: 10px; border-radius: 8px; font-size: 14px; border:none;" onclick="openPostcode('start')">출발지 변경</button>
+            <button style="background:#f0f0f0; border:none; padding:8px 15px; border-radius:8px; font-size:13px;" onclick="openPostcode('start')">변경</button>
         </div>
-
-        <!-- 반전 버튼 -->
-        <button class="swap-btn" onclick="swapAddress()" title="출발지/목적지 반전">🔄</button>
-
-        <!-- 목적지 -->
+        <button class="swap-btn" onclick="swapAddress()">🔄</button>
         <div class="card">
             <div class="label">DESTINATION (목적지)</div>
             <div id="goalAddr" class="addr">서울특별시 강서구 마곡중앙10로 10</div>
-            <button style="background: #f0f0f0; color: #333; width: 80%; padding: 10px; border-radius: 8px; font-size: 14px; border:none;" onclick="openPostcode('goal')">목적지 변경</button>
+            <button style="background:#f0f0f0; border:none; padding:8px 15px; border-radius:8px; font-size:13px;" onclick="openPostcode('goal')">변경</button>
         </div>
     </div>
 
     <div class="btn-group">
+        <!-- 모든 앱 실행 버튼 -->
+        <button class="navi-btn all-btn" onclick="goNavi('all')">🚀 모든 앱 동시 실행</button>
         <button class="navi-btn tmap" onclick="goNavi('tmap')">T맵 실행</button>
         <button class="navi-btn naver" onclick="goNavi('naver')">네이버 지도 실행</button>
         <button class="navi-btn kakao" onclick="goNavi('kakao')">카카오맵 실행</button>
@@ -55,158 +53,16 @@
             goal: { name: "서울특별시 강서구 마곡중앙10로 10", x: "126.8286", y: "37.5615" }
         };
 
-        function addLog(msg, type = 'info') {
+        function addLog(msg) {
             const logBox = document.getElementById('debug-log');
-            const time = new Date().toLocaleTimeString();
-            logBox.innerHTML = `<div>[${time}] ${msg}</div>` + logBox.innerHTML;
+            logBox.innerHTML = `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>` + logBox.innerHTML;
         }
 
-        // 주소 반전 함수
         function swapAddress() {
-            const temp = { ...data.start };
-            data.start = { ...data.goal };
-            data.goal = temp;
-
+            [data.start, data.goal] = [data.goal, data.start];
             document.getElementById('startAddr').innerText = data.start.name;
             document.getElementById('goalAddr').innerText = data.goal.name;
-            addLog("🔄 출발지와 목적지가 바뀌었습니다.", "success");
-        }
-
-        function openPostcode(target) {
-            new daum.Postcode({
-                oncomplete: function(res) {
-                    const addr = res.roadAddress || res.address;
-                    document.getElementById(target + 'Addr').innerText = addr + " (⏳ 좌표 확인 중...)";
-                    data[target].name = addr;
-                    getVworldCoords(addr, target);
-                }
-            }).open();
-        }
-
-        function getVworldCoords(addr, target) {
-            const callbackName = `vworld_${target}`;
-            window[callbackName] = function(json) {
-                if (json.response && json.response.status === "OK") {
-                    const pt = json.response.result.point;
-                    data[target].x = pt.x;
-                    data[target].y = pt.y;
-                    document.getElementById(target + 'Addr').innerText = data[target].name;
-                    addLog(`📍 좌표 획득: ${pt.x}, ${pt.y}`);
-                }
-                document.getElementById(`vscript_${target}`)?.remove();
-            };
-
-            const script = document.createElement('script');
-            script.id = `vscript_${target}`;
-            script.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${callbackName}`;
-            document.head.appendChild(script);
-        }
-
-        function goNavi(type) {
-            const { start, goal } = data;
-            let url = "";
-            if (type === 'tmap') url = `tmap://route?goalname=${encodeURIComponent(goal.name)}&goalx=${goal.x}&goaly=${goal.y}&startname=${encodeURIComponent(start.name)}&startx=${start.x}&starty=${start.y}`;
-            else if (type === 'naver') url = `nmap://route/car?slat=${start.y}&slng=${start.x}&sname=${encodeURIComponent(start.name)}&dlat=${goal.y}&dlng=${goal.x}&dname=${encodeURIComponent(goal.name)}&appname=mynavi`;
-            else if (type === 'kakao') url = `kakaomap://route?sp=${start.y},${start.x}&sname=${encodeURIComponent(start.name)}&ep=${goal.y},${goal.x}&ename=${encodeURIComponent(goal.name)}&by=CAR`;
-            window.location.href = url;
-        }
-        window.onload = () => addLog("🚀 준비 완료");
-    </script>
-</body>
-</html>
-        <button class="tmap" onclick="goNavi('tmap')">T맵 실행</button>
-        <button class="naver" onclick="goNavi('naver')">네이버 지도 실행</button>
-        <button class="kakao" onclick="goNavi('kakao')">카카오맵 실행</button>
-    </div>
-
-    <div id="debug-log"></div>
-
-    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-    <script>
-        const VWORLD_KEY = '62A5D7CE-FE7A-3E45-B9D3-9982BFEB7A91';
-        const logBox = document.getElementById('debug-log');
-
-        let data = {
-            start: { name: "경기 용인시 기흥구 서천동 828", x: "127.0700", y: "37.2455" },
-            goal: { name: "서울특별시 강서구 마곡중앙10로 10", x: "126.8286", y: "37.5615" }
-        };
-
-        function addLog(msg, type = 'info') {
-            const time = new Date().toLocaleTimeString();
-            logBox.innerHTML = `<div class="debug-entry debug-${type}">[${time}] ${msg}</div>` + logBox.innerHTML;
-        }
-
-        function openPostcode(target) {
-            new daum.Postcode({
-                oncomplete: function(res) {
-                    const addr = res.roadAddress || res.address;
-                    document.getElementById(target + 'Addr').innerText = addr + " (⏳ 좌표 확인 중...)";
-                    data[target].name = addr;
-                    addLog(`${target === 'start' ? '출발지' : '목적지'} 변경: ${addr}`, 'success');
-                    
-                    // JSONP 요청을 위한 동적 스크립트 생성 (CORS 해결)
-                    const callbackName = `vworld_${target}`;
-                    window[callbackName] = function(json) {
-                        if (json.response && json.response.status === "OK") {
-                            const pt = json.response.result.point;
-                            data[target].x = pt.x;
-                            data[target].y = pt.y;
-                            document.getElementById(target + 'Addr').innerText = data[target].name;
-                            addLog(`📍 좌표 획득 성공: ${pt.x}, ${pt.y}`, 'success');
-                        } else {
-                            addLog(`❌ 좌표 변환 실패`, 'error');
-                            document.getElementById(target + 'Addr').innerText = data[target].name + " (⚠️ 좌표 실패)";
-                        }
-                        document.getElementById(`js_${target}`)?.remove();
-                    };
-
-                    const script = document.createElement('script');
-                    script.id = `js_${target}`;
-                    script.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${callbackName}`;
-                    document.head.appendChild(script);
-                }
-            }).open();
-        }
-
-        function goNavi(type) {
-            const s = data.start;
-            const g = data.goal;
-            if (!g.x || !g.y) { alert("좌표를 확인 중입니다."); return; }
-
-            addLog(`${type} 실행 시도`, 'info');
-            let url = "";
-            if (type === 'tmap') url = `tmap://route?goalname=${encodeURIComponent(g.name)}&goalx=${g.x}&goaly=${g.y}&startname=${encodeURIComponent(s.name)}&startx=${s.x}&starty=${s.y}`;
-            else if (type === 'naver') url = `nmap://route/car?slat=${s.y}&slng=${s.x}&sname=${encodeURIComponent(s.name)}&dlat=${g.y}&dlng=${g.x}&dname=${encodeURIComponent(g.name)}&appname=mynavi`;
-            else if (type === 'kakao') url = `kakaomap://route?sp=${s.y},${s.x}&sname=${encodeURIComponent(s.name)}&ep=${g.y},${g.x}&ename=${encodeURIComponent(g.name)}&by=CAR`;
-            
-            window.location.href = url;
-        }
-
-        window.onload = () => addLog('🚀 준비 완료 (용인 -> 마곡)', 'success');
-    </script>
-</body>
-</html>
-    <div class="btn-group">
-        <button class="tmap" id="tmapBtn" onclick="goNavi('tmap')">T맵 실행</button>
-        <button class="naver" id="naverBtn" onclick="goNavi('naver')">네이버 지도 실행</button>
-        <button class="kakao" id="kakaoBtn" onclick="goNavi('kakao')">카카오맵 실행</button>
-    </div>
-
-    <div id="debug-log"></div>
-
-    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-    <script>
-        const VWORLD_KEY = '62A5D7CE-FE7A-3E45-B9D3-9982BFEB7A91';
-        const logContainer = document.getElementById('debug-log');
-
-        let data = {
-            start: { name: "경기 용인시 기흥구 서천동 828", x: "127.0700", y: "37.2455" },
-            goal: { name: "서울특별시 강서구 마곡중앙10로 10", x: "126.8286", y: "37.5615" }
-        };
-
-        function addLog(msg, type = 'info') {
-            const time = new Date().toLocaleTimeString();
-            logContainer.innerHTML = `<div class="debug-entry debug-${type}">[${time}] ${msg}</div>` + logContainer.innerHTML;
+            addLog("🔄 경로 반전 완료");
         }
 
         function openPostcode(target) {
@@ -215,65 +71,45 @@
                     const addr = res.roadAddress || res.address;
                     document.getElementById(target + 'Addr').innerText = addr + " (좌표 확인 중...)";
                     data[target].name = addr;
-                    addLog(`${target === 'start' ? '출발지' : '목적지'} 선택: ${addr}`, 'success');
-                    
-                    // JSONP 방식으로 좌표 요청 (보안 에러 방지)
-                    getVworldCoords(addr, target);
+                    getCoords(addr, target);
                 }
             }).open();
         }
 
-        function getVworldCoords(addr, target) {
-            addLog(`🌐 V-World 좌표 변환 중...`, 'info');
-            
-            // 기존 콜백 함수가 있다면 제거
-            const callbackName = `vworldCallback_${target}`;
-            
-            window[callbackName] = function(json) {
-                if (json.response && json.response.status === "OK") {
-                    const point = json.response.result.point;
-                    data[target].x = point.x;
-                    data[target].y = point.y;
+        function getCoords(addr, target) {
+            const cb = `v_${target}_${Date.now()}`;
+            window[cb] = (json) => {
+                if(json.response?.status === "OK") {
+                    const pt = json.response.result.point;
+                    data[target].x = pt.x; data[target].y = pt.y;
                     document.getElementById(target + 'Addr').innerText = data[target].name;
-                    addLog(`📍 좌표 획득 완료: ${point.x}, ${point.y}`, 'success');
-                } else {
-                    addLog(`⚠️ 좌표 변환 실패 (${json.response?.status})`, 'error');
-                    document.getElementById(target + 'Addr').innerText = data[target].name + " (좌표 실패)";
+                    addLog(`📍 좌표 확인: ${pt.x}, ${pt.y}`);
                 }
-                // 사용한 스크립트 태그 삭제
-                document.getElementById(`vworld_script_${target}`)?.remove();
             };
-
-            const script = document.createElement('script');
-            script.id = `vworld_script_${target}`;
-            script.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${callbackName}`;
-            document.head.appendChild(script);
+            const s = document.createElement('script');
+            s.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${cb}`;
+            document.head.appendChild(s);
         }
 
         function goNavi(type) {
-            const s = data.start;
-            const g = data.goal;
+            const { start: s, goal: g } = data;
+            const urls = {
+                tmap: `tmap://route?goalname=${encodeURIComponent(g.name)}&goalx=${g.x}&goaly=${g.y}&startname=${encodeURIComponent(s.name)}&startx=${s.x}&starty=${s.y}`,
+                naver: `nmap://route/car?slat=${s.y}&slng=${s.x}&sname=${encodeURIComponent(s.name)}&dlat=${g.y}&dlng=${g.x}&dname=${encodeURIComponent(g.name)}&appname=mynavi`,
+                kakao: `kakaomap://route?sp=${s.y},${s.x}&sname=${encodeURIComponent(s.name)}&ep=${g.y},${g.x}&ename=${encodeURIComponent(g.name)}&by=CAR`
+            };
 
-            if (!g.x || !g.y) {
-                alert("목적지 좌표를 불러오는 중입니다. 잠시만 기다려주세요.");
-                return;
+            if (type === 'all') {
+                addLog("🚀 모든 앱 순차 실행...");
+                Object.values(urls).forEach(url => {
+                    setTimeout(() => { window.location.href = url; }, 500);
+                });
+            } else {
+                addLog(`🚗 ${type} 실행`);
+                window.location.href = urls[type];
             }
-
-            addLog(`🚗 ${type} 앱 호출 시도...`, 'info');
-
-            let url = "";
-            if (type === 'tmap') {
-                url = `tmap://route?goalname=${encodeURIComponent(g.name)}&goalx=${g.x}&goaly=${g.y}&startname=${encodeURIComponent(s.name)}&startx=${s.x}&starty=${s.y}`;
-            } else if (type === 'naver') {
-                url = `nmap://route/car?slat=${s.y}&slng=${s.x}&sname=${encodeURIComponent(s.name)}&dlat=${g.y}&dlng=${g.x}&dname=${encodeURIComponent(g.name)}&appname=mynavi`;
-            } else if (type === 'kakao') {
-                url = `kakaomap://route?sp=${s.y},${s.x}&sname=${encodeURIComponent(s.name)}&ep=${g.y},${g.x}&ename=${encodeURIComponent(g.name)}&by=CAR`;
-            }
-
-            window.location.href = url;
         }
-
-        window.onload = () => addLog('🚀 통합 내비게이션 준비 완료', 'success');
+        window.onload = () => addLog("🚀 준비 완료");
     </script>
 </body>
 </html>
