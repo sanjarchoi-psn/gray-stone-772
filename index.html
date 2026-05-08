@@ -11,7 +11,9 @@
         .addr { font-size: 16px; color: #333; font-weight: 500; min-height: 20px; margin-bottom: 10px; word-break: keep-all; width: 85%; }
         .swap-btn { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: #fff; border: 1px solid #ddd; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-size: 20px; }
         .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
-        button.navi-btn { padding: 18px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; cursor: pointer; }
+        button { cursor: pointer; border: none; }
+        button.navi-btn { padding: 18px; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; width: 100%; }
+        .addr-btn { background: #f0f0f0; color: #333; padding: 8px 15px; border-radius: 8px; font-size: 13px; }
         .all-btn { background: #333; margin-bottom: 5px; border: 2px solid #000; }
         .tmap { background: #FF4B2B; } .naver { background: #03CF5D; } .kakao { background: #FAE100; color: #3c1e1e; }
         #debug-log { background: #1e1e1e; color: #00ff00; padding: 12px; margin-top: 20px; font-size: 11px; max-height: 120px; overflow-y: auto; border-radius: 8px; font-family: monospace; }
@@ -24,7 +26,7 @@
         <div class="card">
             <div class="label">START (출발지)</div>
             <div id="startAddr" class="addr">경기 용인시 기흥구 서천동 828</div>
-            <button style="background:#f0f0f0; border:none; padding:8px 15px; border-radius:8px; font-size:13px; cursor:pointer;" onclick="sample4_execDaumPostcode('start')">변경</button>
+            <button class="addr-btn" onclick="sample4_execDaumPostcode('start')">변경</button>
         </div>
 
         <button class="swap-btn" onclick="swapAddress()">🔄</button>
@@ -32,12 +34,12 @@
         <div class="card">
             <div class="label">DESTINATION (목적지)</div>
             <div id="goalAddr" class="addr">서울특별시 강서구 마곡중앙10로 10</div>
-            <button style="background:#f0f0f0; border:none; padding:8px 15px; border-radius:8px; font-size:13px; cursor:pointer;" onclick="sample4_execDaumPostcode('goal')">변경</button>
+            <button class="addr-btn" onclick="sample4_execDaumPostcode('goal')">변경</button>
         </div>
     </div>
 
     <div class="btn-group">
-        <button class="navi-btn all-btn" onclick="runAllNavi()">🚀 모든 앱 순차 실행</button>
+        <button class="navi-btn all-btn" onclick="goNavi('all')">🚀 모든 앱 순차 실행</button>
         <button class="navi-btn tmap" onclick="goNavi('tmap')">T맵 실행</button>
         <button class="navi-btn naver" onclick="goNavi('naver')">네이버 지도 실행</button>
         <button class="navi-btn kakao" onclick="goNavi('kakao')">카카오맵 실행</button>
@@ -45,7 +47,6 @@
 
     <div id="debug-log"></div>
 
-    <!-- 주소 검색 API 스크립트 -->
     <script src="https://daumcdn.net"></script>
     <script>
         const VWORLD_KEY = '62A5D7CE-FE7A-3E45-B9D3-9982BFEB7A91';
@@ -59,73 +60,65 @@
             logBox.innerHTML = `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>` + logBox.innerHTML;
         }
 
-        // 주소 검색 함수 복구
+        // 주소 변경 (함수명 일치)
         function sample4_execDaumPostcode(target) {
             new daum.Postcode({
                 oncomplete: function(res) {
                     const addr = res.roadAddress || res.address;
-                    document.getElementById(target + 'Addr').innerText = addr + " (⏳ 좌표 확인 중...)";
+                    document.getElementById(target + 'Addr').innerText = addr + " (⏳)";
                     data[target].name = addr;
-                    getVworldCoords(addr, target);
+                    getCoords(addr, target);
                 }
             }).open();
         }
 
-        // 좌표 획득 함수 (Promise 기반 안정화)
-        function getVworldCoords(addr, target) {
-            const callbackName = `vworld_${target}_${Date.now()}`;
-            window[callbackName] = function(json) {
-                if (json.response && json.response.status === "OK") {
+        // 좌표 갱신 (스크린샷 방식 반영)
+        function getCoords(addr, target) {
+            const cb = `v_${target}_${Date.now()}`;
+            window[cb] = (json) => {
+                if (json.response?.status === "OK") {
                     const pt = json.response.result.point;
-                    data[target].x = pt.x;
-                    data[target].y = pt.y;
+                    data[target].x = pt.x; data[target].y = pt.y;
                     document.getElementById(target + 'Addr').innerText = data[target].name;
-                    addLog(`📍 [${target}] 좌표 갱신 완료`);
-                } else {
-                    addLog(`❌ [${target}] 좌표 검색 실패`);
+                    addLog(`📍 좌표 확인: ${pt.x}, ${pt.y}`);
                 }
-                delete window[callbackName];
             };
-
-            const script = document.createElement('script');
-            script.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${callbackName}`;
-            document.head.appendChild(script);
+            const s = document.createElement('script');
+            s.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${cb}`;
+            document.head.appendChild(s);
         }
 
         function swapAddress() {
-            const temp = { ...data.start };
-            data.start = { ...data.goal };
-            data.goal = temp;
+            [data.start, data.goal] = [data.goal, data.start];
             document.getElementById('startAddr').innerText = data.start.name;
             document.getElementById('goalAddr').innerText = data.goal.name;
-            addLog("🔄 경로 반전 완료");
+            addLog("🔄 경로 반전");
         }
 
-        function getNaviUrl(type) {
+        // 스크린샷의 goNavi 로직 (forEach 기반)
+        function goNavi(type) {
             const { start: s, goal: g } = data;
-            if (type === 'tmap') return `tmap://route?goalname=${encodeURIComponent(g.name)}&goalx=${g.x}&goaly=${g.y}&startname=${encodeURIComponent(s.name)}&startx=${s.x}&starty=${s.y}`;
-            if (type === 'naver') return `nmap://route/car?slat=${s.y}&slng=${s.x}&sname=${encodeURIComponent(s.name)}&dlat=${g.y}&dlng=${g.x}&dname=${encodeURIComponent(g.name)}&appname=mynavi`;
-            if (type === 'kakao') return `kakaomap://route?sp=${s.y},${s.x}&sname=${encodeURIComponent(s.name)}&ep=${g.y},${g.x}&ename=${encodeURIComponent(g.name)}&by=CAR`;
-        }
+            const urls = {
+                tmap: `tmap://route?goalname=${encodeURIComponent(g.name)}&goalx=${g.x}&goaly=${g.y}&startname=${encodeURIComponent(s.name)}&startx=${s.x}&starty=${s.y}`,
+                naver: `nmap://route/car?slat=${s.y}&slng=${s.x}&sname=${encodeURIComponent(s.name)}&dlat=${g.y}&dlng=${g.x}&dname=${encodeURIComponent(g.name)}&appname=mynavi`,
+                kakao: `kakaomap://route?sp=${s.y},${s.x}&sname=${encodeURIComponent(s.name)}&ep=${g.y},${g.x}&ename=${encodeURIComponent(g.name)}&by=CAR`
+            };
 
-        // d7fae7 커밋 기반의 안정적인 순차 실행 로직
-        async function runAllNavi() {
-            addLog("🚀 모든 앱 순차 실행 시작...");
-            const apps = ['tmap', 'naver', 'kakao'];
-            for (const app of apps) {
-                addLog(`${app} 호출 중...`);
-                window.location.href = getNaviUrl(app);
-                // 브라우저가 실행 알림을 띄울 시간을 충분히 확보 (2초)
-                await new Promise(resolve => setTimeout(resolve, 2000));
+            if (type === 'all') {
+                addLog("🚀 모든 앱 순차 실행...");
+                // 스크린샷 방식: Object.values(urls).forEach 사용
+                Object.values(urls).forEach((url, index) => {
+                    setTimeout(() => {
+                        window.location.href = url;
+                    }, index * 2000); // 가려짐 방지를 위해 간격을 2초로 설정
+                });
+            } else {
+                addLog(`🚗 ${type} 실행`);
+                window.location.href = urls[type];
             }
         }
 
-        function goNavi(type) {
-            addLog(`🚗 ${type} 실행`);
-            window.location.href = getNaviUrl(type);
-        }
-
-        window.onload = () => addLog("🚀 시스템 준비 완료");
+        window.onload = () => addLog("🚀 준비 완료");
     </script>
 </body>
 </html>
