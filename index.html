@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>통합 내비게이션</title>
+    <script src="https://daumcdn.net"></script>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f2f5; margin: 0; }
         .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #eee; position: relative; }
@@ -47,7 +48,6 @@
 
     <div id="debug-log"></div>
 
-    <script src="https://daumcdn.net"></script>
     <script>
         const VWORLD_KEY = '62A5D7CE-FE7A-3E45-B9D3-9982BFEB7A91';
         let data = {
@@ -60,28 +60,30 @@
             logBox.innerHTML = `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>` + logBox.innerHTML;
         }
 
-        // 주소 변경 (함수명 일치)
         function sample4_execDaumPostcode(target) {
             new daum.Postcode({
                 oncomplete: function(res) {
                     const addr = res.roadAddress || res.address;
                     document.getElementById(target + 'Addr').innerText = addr + " (⏳)";
                     data[target].name = addr;
-                    getCoords(addr, target);
+                    getCoords(addr, target); // 주소 선택 즉시 좌표 갱신 실행
                 }
             }).open();
         }
 
-        // 좌표 갱신 (스크린샷 방식 반영)
         function getCoords(addr, target) {
             const cb = `v_${target}_${Date.now()}`;
             window[cb] = (json) => {
                 if (json.response?.status === "OK") {
                     const pt = json.response.result.point;
-                    data[target].x = pt.x; data[target].y = pt.y;
-                    document.getElementById(target + 'Addr').innerText = data[target].name;
-                    addLog(`📍 좌표 확인: ${pt.x}, ${pt.y}`);
+                    data[target].x = pt.x; 
+                    data[target].y = pt.y;
+                    document.getElementById(target + 'Addr').innerText = data[target].name; // 로딩 표시 제거
+                    addLog(`📍 [${target}] 좌표 확인: ${pt.x}, ${pt.y}`);
+                } else {
+                    addLog(`❌ [${target}] 좌표 획득 실패`);
                 }
+                delete window[cb];
             };
             const s = document.createElement('script');
             s.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${cb}`;
@@ -92,10 +94,9 @@
             [data.start, data.goal] = [data.goal, data.start];
             document.getElementById('startAddr').innerText = data.start.name;
             document.getElementById('goalAddr').innerText = data.goal.name;
-            addLog("🔄 경로 반전");
+            addLog("🔄 경로 반전 (좌표 유지됨)");
         }
 
-        // 스크린샷의 goNavi 로직 (forEach 기반)
         function goNavi(type) {
             const { start: s, goal: g } = data;
             const urls = {
@@ -105,12 +106,11 @@
             };
 
             if (type === 'all') {
-                addLog("🚀 모든 앱 순차 실행...");
-                // 스크린샷 방식: Object.values(urls).forEach 사용
+                addLog("🚀 순차 실행 예약...");
                 Object.values(urls).forEach((url, index) => {
                     setTimeout(() => {
                         window.location.href = url;
-                    }, index * 2000); // 가려짐 방지를 위해 간격을 2초로 설정
+                    }, index * 2000); 
                 });
             } else {
                 addLog(`🚗 ${type} 실행`);
