@@ -12,9 +12,9 @@
         .swap-btn { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: #fff; border: 1px solid #ddd; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-size: 20px; }
         .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
         button.navi-btn { padding: 18px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; cursor: pointer; }
-        .all-btn { background: #000; border: 2px solid #333; margin-bottom: 5px; }
+        .all-btn { background: #333; margin-bottom: 5px; border: 2px solid #000; }
         .tmap { background: #FF4B2B; } .naver { background: #03CF5D; } .kakao { background: #FAE100; color: #3c1e1e; }
-        iframe { display: none; }
+        #debug-log { background: #1e1e1e; color: #00ff00; padding: 12px; margin-top: 20px; font-size: 11px; max-height: 120px; overflow-y: auto; border-radius: 8px; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -35,11 +35,13 @@
     </div>
 
     <div class="btn-group">
-        <button class="navi-btn all-btn" onclick="goNavi('all')">🚀 모든 앱 즉시 호출 (대기 방식)</button>
+        <button class="navi-btn all-btn" onclick="goNavi('all')">🚀 모든 앱 순차 실행 (어제 방식)</button>
         <button class="navi-btn tmap" onclick="goNavi('tmap')">T맵 실행</button>
         <button class="navi-btn naver" onclick="goNavi('naver')">네이버 지도 실행</button>
         <button class="navi-btn kakao" onclick="goNavi('kakao')">카카오맵 실행</button>
     </div>
+
+    <div id="debug-log"></div>
 
     <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
     <script>
@@ -49,17 +51,23 @@
             goal: { name: "서울특별시 강서구 마곡중앙10로 10", x: "126.8286", y: "37.5615" }
         };
 
+        function addLog(msg) {
+            const logBox = document.getElementById('debug-log');
+            logBox.innerHTML = `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>` + logBox.innerHTML;
+        }
+
         function swapAddress() {
             [data.start, data.goal] = [data.goal, data.start];
             document.getElementById('startAddr').innerText = data.start.name;
             document.getElementById('goalAddr').innerText = data.goal.name;
+            addLog("🔄 경로 반전 완료");
         }
 
         function openPostcode(target) {
             new daum.Postcode({
                 oncomplete: function(res) {
                     const addr = res.roadAddress || res.address;
-                    document.getElementById(target + 'Addr').innerText = addr;
+                    document.getElementById(target + 'Addr').innerText = addr + " (⏳)";
                     data[target].name = addr;
                     getCoords(addr, target);
                 }
@@ -72,6 +80,8 @@
                 if(json.response?.status === "OK") {
                     const pt = json.response.result.point;
                     data[target].x = pt.x; data[target].y = pt.y;
+                    document.getElementById(target + 'Addr').innerText = data[target].name;
+                    addLog(`📍 좌표 획득 완료`);
                 }
             };
             const s = document.createElement('script');
@@ -88,18 +98,27 @@
             };
 
             if (type === 'all') {
-                // 숨겨진 iframe을 사용하여 지연 시간 없이 모든 앱 신호를 즉시 보냄
-                Object.values(urls).forEach(url => {
-                    const ifr = document.createElement('iframe');
-                    ifr.src = url;
-                    document.body.appendChild(ifr);
-                    // 신호 발송 후 프레임 제거 (대기 시간 확보)
-                    setTimeout(() => { if (ifr) document.body.removeChild(ifr); }, 2000);
-                });
+                addLog("🚀 모든 앱 순차 실행 시작...");
+                // 1. T맵 실행
+                window.location.href = urls.tmap;
+                
+                // 2. 네이버 (1.5초 후)
+                setTimeout(() => {
+                    addLog("네이버 지도 호출...");
+                    window.location.href = urls.naver;
+                }, 1500);
+
+                // 3. 카카오 (3초 후)
+                setTimeout(() => {
+                    addLog("카카오맵 호출...");
+                    window.location.href = urls.kakao;
+                }, 3000);
             } else {
+                addLog(`🚗 ${type} 실행`);
                 window.location.href = urls[type];
             }
         }
+        window.onload = () => addLog("🚀 시스템 준비 완료");
     </script>
 </body>
 </html>
