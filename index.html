@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="robots" content="noindex, nofollow">
     <title>통합 내비게이션</title>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f2f5; margin: 0; }
@@ -35,7 +36,8 @@
     </div>
 
     <div class="btn-group">
-        <button class="navi-btn all-btn" onclick="goNavi('all')">🚀 모든 앱 순차 실행 (어제 방식)</button>
+        <!-- 모든 앱 실행 버튼 -->
+        <button class="navi-btn all-btn" onclick="goNavi('all')">🚀 모든 앱 동시 실행</button>
         <button class="navi-btn tmap" onclick="goNavi('tmap')">T맵 실행</button>
         <button class="navi-btn naver" onclick="goNavi('naver')">네이버 지도 실행</button>
         <button class="navi-btn kakao" onclick="goNavi('kakao')">카카오맵 실행</button>
@@ -67,7 +69,7 @@
             new daum.Postcode({
                 oncomplete: function(res) {
                     const addr = res.roadAddress || res.address;
-                    document.getElementById(target + 'Addr').innerText = addr + " (⏳)";
+                    document.getElementById(target + 'Addr').innerText = addr + " (좌표 확인 중...)";
                     data[target].name = addr;
                     getCoords(addr, target);
                 }
@@ -81,7 +83,7 @@
                     const pt = json.response.result.point;
                     data[target].x = pt.x; data[target].y = pt.y;
                     document.getElementById(target + 'Addr').innerText = data[target].name;
-                    addLog(`📍 좌표 획득 완료`);
+                    addLog(`📍 좌표 확인: ${pt.x}, ${pt.y}`);
                 }
             };
             const s = document.createElement('script');
@@ -98,27 +100,16 @@
             };
 
             if (type === 'all') {
-                addLog("🚀 모든 앱 순차 실행 시작...");
-                // 1. T맵 실행
-                window.location.href = urls.tmap;
-                
-                // 2. 네이버 (1.5초 후)
-                setTimeout(() => {
-                    addLog("네이버 지도 호출...");
-                    window.location.href = urls.naver;
-                }, 1500);
-
-                // 3. 카카오 (3초 후)
-                setTimeout(() => {
-                    addLog("카카오맵 호출...");
-                    window.location.href = urls.kakao;
-                }, 3000);
+                addLog("🚀 모든 앱 순차 실행...");
+                Object.values(urls).forEach(url => {
+                    setTimeout(() => { window.location.href = url; }, 500);
+                });
             } else {
                 addLog(`🚗 ${type} 실행`);
                 window.location.href = urls[type];
             }
         }
-        window.onload = () => addLog("🚀 시스템 준비 완료");
+        window.onload = () => addLog("🚀 준비 완료");
     </script>
 </body>
 </html>
