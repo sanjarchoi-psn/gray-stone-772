@@ -11,8 +11,7 @@
         .addr { font-size: 16px; color: #333; font-weight: 500; min-height: 20px; margin-bottom: 10px; word-break: keep-all; width: 85%; }
         .swap-btn { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: #fff; border: 1px solid #ddd; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-size: 20px; }
         .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
-        /* 버튼 디자인을 유지한 링크 태그 */
-        .navi-link { display: block; text-decoration: none; padding: 18px; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; text-align: center; cursor: pointer; }
+        .navi-link { display: block; text-decoration: none; padding: 18px; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; text-align: center; cursor: pointer; border: none; width: 100%; box-sizing: border-box; }
         .all-btn { background: #000; border: 2px solid #333; }
         .tmap { background: #FF4B2B; } .naver { background: #03CF5D; } .kakao { background: #FAE100; color: #3c1e1e; }
         #debug-log { background: #1e1e1e; color: #00ff00; padding: 12px; margin-top: 20px; font-size: 11px; max-height: 100px; overflow-y: auto; border-radius: 8px; font-family: monospace; }
@@ -36,11 +35,10 @@
     </div>
 
     <div class="btn-group">
-        <!-- 동시 실행은 기술적 한계로 팝업 형태 유지, 개별 버튼은 직접 링크 -->
         <button class="navi-link all-btn" onclick="goAllNavi()">🔥 모든 앱 즉시 호출</button>
-        <a id="tmapLink" class="navi-link tmap" href="#">T맵 실행</a>
-        <a id="naverLink" class="navi-link naver" href="#">네이버 지도 실행</a>
-        <a id="kakaoLink" class="navi-link kakao" href="#">카카오맵 실행</a>
+        <a id="tmapLink" class="navi-link tmap">T맵 실행</a>
+        <a id="naverLink" class="navi-link naver">네이버 지도 실행</a>
+        <a id="kakaoLink" class="navi-link kakao">카카오맵 실행</a>
     </div>
 
     <div id="debug-log"></div>
@@ -53,15 +51,9 @@
             goal: { name: "서울특별시 강서구 마곡중앙10로 10", x: "126.8286", y: "37.5615" }
         };
 
-        function addLog(msg) {
-            const logBox = document.getElementById('debug-log');
-            logBox.innerHTML = `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>` + logBox.innerHTML;
-        }
-
-        // 링크 주소를 실시간으로 갱신하는 함수
         function updateLinks() {
             const { start: s, goal: g } = data;
-            
+            // 안드로이드 크롬 최적화 인텐트 구조 적용 시도
             const tmap = `tmap://route?goalname=${encodeURIComponent(g.name)}&goalx=${g.x}&goaly=${g.y}&startname=${encodeURIComponent(s.name)}&startx=${s.x}&starty=${s.y}`;
             const naver = `nmap://route/car?slat=${s.y}&slng=${s.x}&sname=${encodeURIComponent(s.name)}&dlat=${g.y}&dlng=${g.x}&dname=${encodeURIComponent(g.name)}&appname=mynavi`;
             const kakao = `kakaomap://route?sp=${s.y},${s.x}&sname=${encodeURIComponent(s.name)}&ep=${g.y},${g.x}&ename=${encodeURIComponent(g.name)}&by=CAR`;
@@ -69,7 +61,6 @@
             document.getElementById('tmapLink').href = tmap;
             document.getElementById('naverLink').href = naver;
             document.getElementById('kakaoLink').href = kakao;
-            addLog("🔗 버튼 링크 업데이트 완료");
         }
 
         function swapAddress() {
@@ -77,7 +68,6 @@
             document.getElementById('startAddr').innerText = data.start.name;
             document.getElementById('goalAddr').innerText = data.goal.name;
             updateLinks();
-            addLog("🔄 경로 반전");
         }
 
         function openPostcode(target) {
@@ -99,7 +89,6 @@
                     data[target].x = pt.x; data[target].y = pt.y;
                     document.getElementById(target + 'Addr').innerText = data[target].name;
                     updateLinks();
-                    addLog(`📍 좌표 획득 완료`);
                 }
             };
             const s = document.createElement('script');
@@ -108,17 +97,19 @@
         }
 
         function goAllNavi() {
-            addLog("🚀 모든 앱 순차 호출 시도...");
-            // 동시 실행은 여전히 브라우저 팝업 허용이 필요할 수 있습니다.
-            window.open(document.getElementById('tmapLink').href, '_blank');
-            setTimeout(() => window.open(document.getElementById('naverLink').href, '_blank'), 500);
-            setTimeout(() => window.open(document.getElementById('kakaoLink').href, '_blank'), 1000);
+            const links = [
+                document.getElementById('tmapLink').href,
+                document.getElementById('naverLink').href,
+                document.getElementById('kakaoLink').href
+            ];
+            
+            // 첫 번째는 현재 창, 나머지는 시간차를 두고 호출
+            location.href = links[0];
+            setTimeout(() => { window.open(links[1], '_blank'); }, 500);
+            setTimeout(() => { window.open(links[2], '_blank'); }, 1000);
         }
 
-        window.onload = () => {
-            updateLinks();
-            addLog("🚀 시스템 준비 완료");
-        };
+        window.onload = updateLinks;
     </script>
 </body>
 </html>
