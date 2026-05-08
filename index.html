@@ -24,13 +24,15 @@
         <div class="card">
             <div class="label">START (출발지)</div>
             <div id="startAddr" class="addr">경기 용인시 기흥구 서천동 828</div>
-            <button style="background:#f0f0f0; border:none; padding:8px 15px; border-radius:8px; font-size:13px;" onclick="openPostcode('start')">변경</button>
+            <button style="background:#f0f0f0; border:none; padding:8px 15px; border-radius:8px; font-size:13px; cursor:pointer;" onclick="sample4_execDaumPostcode('start')">변경</button>
         </div>
+
         <button class="swap-btn" onclick="swapAddress()">🔄</button>
+
         <div class="card">
             <div class="label">DESTINATION (목적지)</div>
             <div id="goalAddr" class="addr">서울특별시 강서구 마곡중앙10로 10</div>
-            <button style="background:#f0f0f0; border:none; padding:8px 15px; border-radius:8px; font-size:13px;" onclick="openPostcode('goal')">변경</button>
+            <button style="background:#f0f0f0; border:none; padding:8px 15px; border-radius:8px; font-size:13px; cursor:pointer;" onclick="sample4_execDaumPostcode('goal')">변경</button>
         </div>
     </div>
 
@@ -43,6 +45,7 @@
 
     <div id="debug-log"></div>
 
+    <!-- 주소 검색 API 스크립트 -->
     <script src="https://daumcdn.net"></script>
     <script>
         const VWORLD_KEY = '62A5D7CE-FE7A-3E45-B9D3-9982BFEB7A91';
@@ -56,16 +59,8 @@
             logBox.innerHTML = `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>` + logBox.innerHTML;
         }
 
-        function swapAddress() {
-            const temp = { ...data.start };
-            data.start = { ...data.goal };
-            data.goal = temp;
-            document.getElementById('startAddr').innerText = data.start.name;
-            document.getElementById('goalAddr').innerText = data.goal.name;
-            addLog("🔄 경로 반전 완료");
-        }
-
-        function openPostcode(target) {
+        // 주소 검색 함수 복구
+        function sample4_execDaumPostcode(target) {
             new daum.Postcode({
                 oncomplete: function(res) {
                     const addr = res.roadAddress || res.address;
@@ -76,30 +71,34 @@
             }).open();
         }
 
-        // Promise 기반 좌표 획득 함수 (베이스 코드 로직 강화)
+        // 좌표 획득 함수 (Promise 기반 안정화)
         function getVworldCoords(addr, target) {
-            return new Promise((resolve, reject) => {
-                const callbackName = `vworld_${target}_${Date.now()}`;
-                window[callbackName] = function(json) {
-                    if (json.response && json.response.status === "OK") {
-                        const pt = json.response.result.point;
-                        data[target].x = pt.x;
-                        data[target].y = pt.y;
-                        document.getElementById(target + 'Addr').innerText = data[target].name;
-                        addLog(`📍 [${target}] 좌표 갱신: ${pt.x}, ${pt.y}`);
-                        resolve(pt);
-                    } else {
-                        addLog(`❌ [${target}] 좌표 실패`);
-                        reject('fail');
-                    }
-                    delete window[callbackName];
-                };
+            const callbackName = `vworld_${target}_${Date.now()}`;
+            window[callbackName] = function(json) {
+                if (json.response && json.response.status === "OK") {
+                    const pt = json.response.result.point;
+                    data[target].x = pt.x;
+                    data[target].y = pt.y;
+                    document.getElementById(target + 'Addr').innerText = data[target].name;
+                    addLog(`📍 [${target}] 좌표 갱신 완료`);
+                } else {
+                    addLog(`❌ [${target}] 좌표 검색 실패`);
+                }
+                delete window[callbackName];
+            };
 
-                const script = document.createElement('script');
-                script.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${callbackName}`;
-                document.head.appendChild(script);
-                setTimeout(() => script.remove(), 1000);
-            });
+            const script = document.createElement('script');
+            script.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${callbackName}`;
+            document.head.appendChild(script);
+        }
+
+        function swapAddress() {
+            const temp = { ...data.start };
+            data.start = { ...data.goal };
+            data.goal = temp;
+            document.getElementById('startAddr').innerText = data.start.name;
+            document.getElementById('goalAddr').innerText = data.goal.name;
+            addLog("🔄 경로 반전 완료");
         }
 
         function getNaviUrl(type) {
@@ -109,14 +108,15 @@
             if (type === 'kakao') return `kakaomap://route?sp=${s.y},${s.x}&sname=${encodeURIComponent(s.name)}&ep=${g.y},${g.x}&ename=${encodeURIComponent(g.name)}&by=CAR`;
         }
 
-        // 베이스 코드의 순차 실행 로직 반영
+        // d7fae7 커밋 기반의 안정적인 순차 실행 로직
         async function runAllNavi() {
             addLog("🚀 모든 앱 순차 실행 시작...");
             const apps = ['tmap', 'naver', 'kakao'];
-            for (let i = 0; i < apps.length; i++) {
-                addLog(`${apps[i]} 호출 중...`);
-                window.location.href = getNaviUrl(apps[i]);
-                await new Promise(r => setTimeout(r, 1500)); // 1.5초 대기
+            for (const app of apps) {
+                addLog(`${app} 호출 중...`);
+                window.location.href = getNaviUrl(app);
+                // 브라우저가 실행 알림을 띄울 시간을 충분히 확보 (2초)
+                await new Promise(resolve => setTimeout(resolve, 2000));
             }
         }
 
