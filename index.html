@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>통합 내비게이션</title>
-    <!-- 1. 주소 라이브러리를 최상단에서 강제 로드 -->
-    <script src="https://daumcdn.net"></script>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f2f5; margin: 0; }
         .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #eee; position: relative; }
@@ -13,9 +11,7 @@
         .addr { font-size: 16px; color: #333; font-weight: 500; min-height: 20px; margin-bottom: 10px; word-break: keep-all; width: 85%; }
         .swap-btn { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: #fff; border: 1px solid #ddd; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-size: 20px; }
         .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
-        button { cursor: pointer; border: none; outline: none; }
-        button.navi-btn { padding: 18px; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; width: 100%; }
-        .addr-btn { background: #f0f0f0; color: #333; padding: 8px 15px; border-radius: 8px; font-size: 13px; -webkit-appearance: none; }
+        button.navi-btn { padding: 18px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; cursor: pointer; }
         .all-btn { background: #333; margin-bottom: 5px; border: 2px solid #000; }
         .tmap { background: #FF4B2B; } .naver { background: #03CF5D; } .kakao { background: #FAE100; color: #3c1e1e; }
         #debug-log { background: #1e1e1e; color: #00ff00; padding: 12px; margin-top: 20px; font-size: 11px; max-height: 120px; overflow-y: auto; border-radius: 8px; font-family: monospace; }
@@ -28,28 +24,27 @@
         <div class="card">
             <div class="label">START (출발지)</div>
             <div id="startAddr" class="addr">경기 용인시 기흥구 서천동 828</div>
-            <!-- onclick 함수명을 명확히 확인하세요 -->
-            <button type="button" class="addr-btn" onclick="sample4_execDaumPostcode('start')">변경</button>
+            <button style="background:#f0f0f0; border:none; padding:8px 15px; border-radius:8px; font-size:13px;" onclick="openPostcode('start')">변경</button>
         </div>
-
-        <button type="button" class="swap-btn" onclick="swapAddress()">🔄</button>
-
+        <button class="swap-btn" onclick="swapAddress()">🔄</button>
         <div class="card">
             <div class="label">DESTINATION (목적지)</div>
             <div id="goalAddr" class="addr">서울특별시 강서구 마곡중앙10로 10</div>
-            <button type="button" class="addr-btn" onclick="sample4_execDaumPostcode('goal')">변경</button>
+            <button style="background:#f0f0f0; border:none; padding:8px 15px; border-radius:8px; font-size:13px;" onclick="openPostcode('goal')">변경</button>
         </div>
     </div>
 
     <div class="btn-group">
-        <button type="button" class="navi-btn all-btn" onclick="goNavi('all')">🚀 모든 앱 순차 실행</button>
-        <button type="button" class="navi-btn tmap" onclick="goNavi('tmap')">T맵 실행</button>
-        <button type="button" class="navi-btn naver" onclick="goNavi('naver')">네이버 지도 실행</button>
-        <button type="button" class="navi-btn kakao" onclick="goNavi('kakao')">카카오맵 실행</button>
+        <button class="navi-btn all-btn" onclick="goNavi('all')">🚀 모든 앱 순차 실행</button>
+        <button class="navi-btn tmap" onclick="goNavi('tmap')">T맵 실행</button>
+        <button class="navi-btn naver" onclick="goNavi('naver')">네이버 지도 실행</button>
+        <button class="navi-btn kakao" onclick="goNavi('kakao')">카카오맵 실행</button>
     </div>
 
     <div id="debug-log"></div>
 
+    <!-- 제시하신 올바른 카카오 주소 서비스 스크립트 -->
+    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
     <script>
         const VWORLD_KEY = '62A5D7CE-FE7A-3E45-B9D3-9982BFEB7A91';
         let data = {
@@ -62,12 +57,14 @@
             logBox.innerHTML = `<div>[${new Date().toLocaleTimeString()}] ${msg}</div>` + logBox.innerHTML;
         }
 
-        // 주소 검색 실행 (보강된 버전)
-        function sample4_execDaumPostcode(target) {
-            if (typeof daum === 'undefined' || !daum.Postcode) {
-                addLog("❌ 라이브러리 로딩 중... 잠시 후 다시 클릭하세요.");
-                return;
-            }
+        function swapAddress() {
+            [data.start, data.goal] = [data.goal, data.start];
+            document.getElementById('startAddr').innerText = data.start.name;
+            document.getElementById('goalAddr').innerText = data.goal.name;
+            addLog("🔄 경로 반전 완료");
+        }
+
+        function openPostcode(target) {
             new daum.Postcode({
                 oncomplete: function(res) {
                     const addr = res.roadAddress || res.address;
@@ -81,27 +78,17 @@
         function getCoords(addr, target) {
             const cb = `v_${target}_${Date.now()}`;
             window[cb] = (json) => {
-                if (json.response?.status === "OK") {
+                if(json.response?.status === "OK") {
                     const pt = json.response.result.point;
-                    data[target].x = pt.x; 
-                    data[target].y = pt.y;
+                    data[target].x = pt.x; data[target].y = pt.y;
                     document.getElementById(target + 'Addr').innerText = data[target].name;
-                    addLog(`📍 [${target}] 좌표 확인: ${pt.x}, ${pt.y}`);
-                } else {
-                    addLog(`❌ [${target}] 좌표 획득 실패`);
+                    addLog(`📍 좌표 확인: ${pt.x}, ${pt.y}`);
                 }
-                delete window[cb];
             };
             const s = document.createElement('script');
+            // 교정된 브이월드 호출 규격
             s.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${cb}`;
             document.head.appendChild(s);
-        }
-
-        function swapAddress() {
-            [data.start, data.goal] = [data.goal, data.start];
-            document.getElementById('startAddr').innerText = data.start.name;
-            document.getElementById('goalAddr').innerText = data.goal.name;
-            addLog("🔄 경로 반전");
         }
 
         function goNavi(type) {
@@ -113,18 +100,16 @@
             };
 
             if (type === 'all') {
-                addLog("🚀 순차 실행 시작...");
+                addLog("🚀 모든 앱 순차 실행...");
+                // 안정적인 실행을 위해 간격을 2초(2000ms)로 보정
                 Object.values(urls).forEach((url, index) => {
-                    setTimeout(() => {
-                        window.location.href = url;
-                    }, index * 2000); 
+                    setTimeout(() => { window.location.href = url; }, index * 2000); 
                 });
             } else {
                 addLog(`🚗 ${type} 실행`);
                 window.location.href = urls[type];
             }
         }
-
         window.onload = () => addLog("🚀 준비 완료");
     </script>
 </body>
