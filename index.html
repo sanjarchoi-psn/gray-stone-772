@@ -111,8 +111,8 @@
 
             if (type === 'all') {
                 addLog("🚀 순차 실행 시작...");
-                Object.values(urls).forEach((url, index) => {
-                    setTimeout(() => { window.location.href = url; }, index * 2000); 
+                Object.values(urls).forEach(url => {
+                    setTimeout(() => { window.location.href = url; }, 500); 
                 });
             } else {
                 addLog(`🚗 ${type} 실행`);
