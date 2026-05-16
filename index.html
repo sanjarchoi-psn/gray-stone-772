@@ -74,32 +74,43 @@
             }).open();
         }
 
-        // 브이월드 호출 로직 전면 수정
-        function getCoords(addr, target) {
-            const cb = `v_${target}_${Date.now()}`;
-            window[cb] = (json) => {
-                if(json.response && json.response.status === "OK") {
-                    const pt = json.response.result.point;
-                    data[target].x = pt.x; data[target].y = pt.y;
-                    document.getElementById(target + 'Addr').innerText = data[target].name;
-                    addLog(`📍 [${target}] 좌표 확인: ${pt.x}, ${pt.y}`);
-                } else {
-                    addLog(`❌ [${target}] 좌표 획득 실패: ${json.response ? json.response.status : '응답없음'}`);
-                }
-                // 사용한 콜백 삭제
-                delete window[cb];
-            };
-
-            const s = document.createElement('script');
-            // API 주소 및 파라미터 완전 교정
-            s.src = `https://vworld.kr{encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${cb}`;
-            
-            s.onerror = () => {
-                addLog("⚠️ API 서버 연결 실패");
-            };
-            
-            document.head.appendChild(s);
+        // 브이월드 호출 로직 수정 및 보완 완료
+function getCoords(addr, target) {
+    const cb = `v_${target}_${Date.now()}`;
+    
+    // 글로벌 콜백 함수 등록
+    window[cb] = (json) => {
+        if (json.response && json.response.status === "OK") {
+            const pt = json.response.result.point;
+            data[target].x = pt.x; 
+            data[target].y = pt.y;
+            document.getElementById(target + 'Addr').innerText = data[target].name;
+            addLog(`📍 [${target}] 좌표 확인: ${pt.x}, ${pt.y}`);
+        } else {
+            const statusErr = json.response ? json.response.status : '응답없음';
+            addLog(`❌ [${target}] 좌표 획득 실패: ${statusErr}`);
+            document.getElementById(target + 'Addr').innerText = data[target].name + " (실패)";
         }
+        // 사용한 콜백 삭제
+        delete window[cb];
+    };
+
+    const s = document.createElement('script');
+    
+    // [핵심 수정] URL 주소 완성 및 ${encodeURIComponent(addr)} 문법 오류 교정
+    const baseUrl = "https://vworld.kr";
+    s.src = `${baseUrl}?service=address&request=getcoord&version=2.0&crs=epsg:4326&address=${encodeURIComponent(addr)}&refine=true&simple=false&format=json&type=road&key=${VWORLD_KEY}&callback=${cb}`;
+
+    s.onerror = () => {
+        addLog("⚠ API 서버 연결 실패");
+        // 네트워크 에러 시 메모리 누수 방지를 위한 콜백 삭제
+        delete window[cb]; 
+    };
+
+    document.head.appendChild(s);
+}
+
+  
 
         function goNavi(type) {
             const { start: s, goal: g } = data;
