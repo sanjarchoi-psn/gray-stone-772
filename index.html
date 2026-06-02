@@ -9,7 +9,7 @@
         .card { background: white; padding: 20px; border-radius: 15px; margin-bottom: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #eee; position: relative; }
         .label { font-size: 12px; color: #007AFF; font-weight: 800; margin-bottom: 8px; }
         .addr { font-size: 16px; color: #333; font-weight: 500; min-height: 20px; margin-bottom: 10px; word-break: keep-all; width: 85%; }
-        .swap-btn { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: #fff; border: 1px solid #ddd; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-size: 20px; }
+        .swap-btn { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: #fff; border: 1px solid #ddd; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; font-size: 20px; }
         .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
         button.navi-btn { padding: 18px; border: none; border-radius: 15px; color: white; font-weight: bold; font-size: 17px; cursor: pointer; }
         .all-btn { background: #333; margin-bottom: 5px; border: 2px solid #000; }
@@ -37,8 +37,8 @@
     <div class="btn-group">
         <button class="navi-btn all-btn" onclick="goNavi('all')">🚀 모든 앱 순차 실행</button>
         <button class="navi-btn tmap" onclick="goNavi('tmap')">T맵 실행</button>
-        <button class="navi-btn naver" onclick="goNavi('naver')">네이버 지도 실행</button>
         <button class="navi-btn kakao" onclick="goNavi('kakao')">카카오맵 실행</button>
+        <button class="navi-btn naver" onclick="goNavi('naver')">네이버 지도 실행</button>
     </div>
 
     <div id="debug-log"></div>
@@ -112,13 +112,13 @@ function getCoords(addr, target) {
             const { start: s, goal: g } = data;
             const urls = {
                 tmap: `tmap://route?goalname=${encodeURIComponent(g.name)}&goalx=${g.x}&goaly=${g.y}&startname=${encodeURIComponent(s.name)}&startx=${s.x}&starty=${s.y}`,
-                naver: `nmap://route/car?slat=${s.y}&slng=${s.x}&sname=${encodeURIComponent(s.name)}&dlat=${g.y}&dlng=${g.x}&dname=${encodeURIComponent(g.name)}&appname=mynavi`,
-                kakao: `kakaomap://route?sp=${s.y},${s.x}&sname=${encodeURIComponent(s.name)}&ep=${g.y},${g.x}&ename=${encodeURIComponent(g.name)}&by=CAR`
+                kakao: `kakaomap://route?sp=${s.y},${s.x}&sname=${encodeURIComponent(s.name)}&ep=${g.y},${g.x}&ename=${encodeURIComponent(g.name)}&by=CAR`,
+                naver: `nmap://route/car?slat=${s.y}&slng=${s.x}&sname=${encodeURIComponent(s.name)}&dlat=${g.y}&dlng=${g.x}&dname=${encodeURIComponent(g.name)}&appname=mynavi`
             };
 
             if (type === 'all') {
                 addLog("🚀 순차 실행 시작...");
-                Object.values(urls).forEach(url => {
+                [urls.tmap, urls.kakao, urls.naver].forEach(url => {
                     setTimeout(() => { window.location.href = url; }, 500); 
                 });
             } else {
